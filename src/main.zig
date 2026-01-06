@@ -1,6 +1,7 @@
 const std = @import("std");
 const zjvm = @import("zjvm");
 const parser = @import("classfile/parser.zig");
+const ac = @import("classfile/access_flags.zig");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -27,6 +28,22 @@ pub fn main() !void {
     std.debug.print("Class file fields count: {d}\n", .{classInfo.fields_count});
     std.debug.print("Class file attributes count: {d}\n", .{classInfo.attributes_count});
 
+    if (ac.ClassAccessFlags.isPublic(classInfo.access_flags)) {
+        std.debug.print("The class is public.\n", .{});
+    }
+
+    if (ac.ClassAccessFlags.isFinal(classInfo.access_flags)) {
+        std.debug.print("The class is final.\n", .{});
+    }
+
+    if (ac.ClassAccessFlags.isAbstract(classInfo.access_flags)) {
+        std.debug.print("The class is abstract.\n", .{});
+    }
+
+    if (ac.ClassAccessFlags.isInterface(classInfo.access_flags)) {
+        std.debug.print("The class is an interface.\n", .{});
+    }
+
     // print all constant pool entries
 
     if (classInfo.constant_pool) |constantPool| {
@@ -40,8 +57,24 @@ pub fn main() !void {
     if (classInfo.fields) |fields| {
         for (fields) |field| {
             std.debug.print("Field: name_index={d}, descriptor_index={d}, access_flags={x}\n", .{ field.name_index, field.descriptor_index, field.access_flags });
-
             std.debug.print("Field Name: {s}\n", .{try classInfo.getFieldName(field)});
+        }
+    }
+
+    // print all methods
+
+    if (classInfo.methods) |methods| {
+        for (methods) |method| {
+            std.debug.print("Method: name_index={d}, descriptor_index={d}, access_flags={x}\n", .{ method.name_index, method.descriptor_index, method.access_flags });
+            std.debug.print("Method Name: {s}\n", .{try classInfo.getMethodName(method)});
+        }
+    }
+
+    // print all attributes
+
+    if (classInfo.attributes) |attributes| {
+        for (attributes) |attribute| {
+            std.debug.print("Attribute: name_index={d}, length={d}\n", .{ attribute.attribute_name_index, attribute.attribute_length });
         }
     }
 

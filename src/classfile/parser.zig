@@ -155,8 +155,8 @@ pub const ConstantPoolInfo = union(cp.CpTag) {
 };
 
 pub const AttributesInfo = struct {
-    attributeNameIndex: types.U2,
-    attributeLength: types.U4,
+    attribute_name_index: types.U2,
+    attribute_length: types.U4,
     info: []const u8,
 
     pub fn parse(cursor: *Cursor) !AttributesInfo {
@@ -165,8 +165,8 @@ pub const AttributesInfo = struct {
         const info = try cursor.readBytes(@intCast(attributeLength));
 
         return AttributesInfo{
-            .attributeNameIndex = attributeNameIndex,
-            .attributeLength = attributeLength,
+            .attribute_name_index = attributeNameIndex,
+            .attribute_length = attributeLength,
             .info = info,
         };
     }
@@ -183,6 +183,43 @@ pub const FieldInfo = struct {
 
     pub fn parse(allocator: *const std.mem.Allocator, cursor: *Cursor) !FieldInfo {
         var self = FieldInfo{
+            .allocator = allocator,
+            .access_flags = 0,
+            .name_index = 0,
+            .descriptor_index = 0,
+            .attributes_count = 0,
+            .attributes = null,
+        };
+
+        self.access_flags = try cursor.readU2();
+        self.name_index = try cursor.readU2();
+        self.descriptor_index = try cursor.readU2();
+        self.attributes_count = try cursor.readU2();
+
+        const count: usize = @intCast(self.attributes_count);
+        self.attributes = try self.allocator.alloc(AttributesInfo, count);
+
+        var i: usize = 0;
+        while (i < count) : (i += 1) {
+            const attr = try AttributesInfo.parse(cursor);
+            self.attributes.?[i] = attr;
+        }
+
+        return self;
+    }
+};
+
+pub const MethodInfo = struct {
+    allocator: *const std.mem.Allocator,
+
+    access_flags: types.U2,
+    name_index: types.U2,
+    descriptor_index: types.U2,
+    attributes_count: types.U2,
+    attributes: ?[]AttributesInfo,
+
+    pub fn parse(allocator: *const std.mem.Allocator, cursor: *Cursor) !MethodInfo {
+        var self = MethodInfo{
             .allocator = allocator,
             .access_flags = 0,
             .name_index = 0,
@@ -230,8 +267,10 @@ pub const ClassInfo = struct {
     fields: ?[]FieldInfo,
 
     methods_count: types.U2,
+    methods: ?[]MethodInfo,
 
     attributes_count: types.U2,
+    attributes: ?[]AttributesInfo,
 
     pub fn init(allocator: *const std.mem.Allocator) ClassInfo {
         return ClassInfo{
@@ -250,7 +289,9 @@ pub const ClassInfo = struct {
             .fields_count = 0,
             .fields = null,
             .methods_count = 0,
+            .methods = null,
             .attributes_count = 0,
+            .attributes = null,
         };
     }
 
@@ -261,6 +302,8 @@ pub const ClassInfo = struct {
         try self.parseClassMetadata(cursor);
         try self.parseInferfaces(cursor);
         try self.parseFields(cursor);
+        try self.parseMethods(cursor);
+        try self.parseAttributes(cursor);
     }
 
     pub fn parseHeaders(self: *ClassInfo, cursor: *Cursor) !void {
@@ -312,18 +355,43 @@ pub const ClassInfo = struct {
         }
     }
 
+    pub fn parseMethods(self: *ClassInfo, cursor: *Cursor) !void {
+        self.methods_count = try cursor.readU2();
+
+        const count: usize = @intCast(self.methods_count);
+        self.methods = try self.allocator.alloc(MethodInfo, count);
+
+        var i: usize = 0;
+        while (i < count) : (i += 1) {
+            const method = try MethodInfo.parse(self.allocator, cursor);
+            self.methods.?[i] = method;
+        }
+    }
+
+    pub fn parseAttributes(self: *ClassInfo, cursor: *Cursor) !void {
+        self.attributes_count = try cursor.readU2();
+        const count: usize = @intCast(self.attributes_count);
+        self.attributes = try self.allocator.alloc(AttributesInfo, count);
+
+        var i: usize = 0;
+        while (i < count) : (i += 1) {
+            const attr = try AttributesInfo.parse(cursor);
+            self.attributes.?[i] = attr;
+        }
+    }
+
     pub fn isValidMagicNumber(self: *ClassInfo) bool {
         return self.magic == 0xCAFEBABE;
     }
 
     pub fn getFieldName(self: *ClassInfo, field: FieldInfo) ![]const u8 {
         const name_index = field.name_index;
-        return self.getFieldNameByIndex(name_index);
+        return self.getConstant(name_index);
     }
 
-    pub fn getFieldNameByIndex(self: *ClassInfo, name_index: types.U2) ![]const u8 {
+    pub fn getConstant(self: *ClassInfo, index: types.U2) ![]const u8 {
         if (self.constant_pool) |constantPool| {
-            const cp_entry = constantPool[@intCast(name_index - 1)];
+            const cp_entry = constantPool[@intCast(index - 1)];
             return switch (cp_entry) {
                 .Utf8 => |str| str,
                 else => return error.InvalidConstantPoolEntry,
@@ -331,6 +399,11 @@ pub const ClassInfo = struct {
         } else {
             return error.ConstantPoolNotInitialized;
         }
+    }
+
+    pub fn getMethodName(self: *ClassInfo, method: MethodInfo) ![]const u8 {
+        const name_index = method.name_index;
+        return self.getConstant(name_index);
     }
 };
 
