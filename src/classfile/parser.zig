@@ -3,9 +3,11 @@ const types = @import("types.zig");
 const cp = @import("constant_pool.zig");
 const ac = @import("access_flags.zig");
 const utils = @import("utils.zig");
-const a = @import("attributes.zig");
-const f = @import("fields.zig");
-const m = @import("methods.zig");
+
+const AttributesInfo = @import("attributes.zig").AttributesInfo;
+const FieldInfo = @import("fields.zig").FieldInfo;
+const MethodInfo = @import("methods.zig").MethodInfo;
+const CodeAttribute = @import("code.zig").CodeAttribute;
 
 pub const ClassInfo = struct {
     allocator: *const std.mem.Allocator,
@@ -25,13 +27,13 @@ pub const ClassInfo = struct {
     interfaces: ?[]types.U2,
 
     fields_count: types.U2,
-    fields: ?[]f.FieldInfo,
+    fields: ?[]FieldInfo,
 
     methods_count: types.U2,
-    methods: ?[]m.MethodInfo,
+    methods: ?[]MethodInfo,
 
     attributes_count: types.U2,
-    attributes: ?[]a.AttributesInfo,
+    attributes: ?[]AttributesInfo,
 
     pub fn init(allocator: *const std.mem.Allocator) ClassInfo {
         return ClassInfo{
@@ -117,27 +119,27 @@ pub const ClassInfo = struct {
     pub fn parseFields(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.fields_count = try cursor.readU2();
         const count: usize = @intCast(self.fields_count);
-        self.fields = try f.FieldInfo.parseAll(cursor, count, self.allocator);
+        self.fields = try FieldInfo.parseAll(cursor, count, self.allocator);
     }
 
     pub fn parseMethods(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.methods_count = try cursor.readU2();
 
         const count: usize = @intCast(self.methods_count);
-        self.methods = try m.MethodInfo.parseAll(cursor, count, self.allocator);
+        self.methods = try MethodInfo.parseAll(cursor, count, self.allocator);
     }
 
     pub fn parseAttributes(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.attributes_count = try cursor.readU2();
         const count: usize = @intCast(self.attributes_count);
-        self.attributes = try a.AttributesInfo.parseAll(cursor, count, self.allocator);
+        self.attributes = try AttributesInfo.parseAll(cursor, count, self.allocator);
     }
 
     pub fn isValidMagicNumber(self: *ClassInfo) bool {
         return self.magic == 0xCAFEBABE;
     }
 
-    pub fn getFieldName(self: *ClassInfo, field: f.FieldInfo) ![]const u8 {
+    pub fn getFieldName(self: *ClassInfo, field: FieldInfo) ![]const u8 {
         const name_index = field.name_index;
         return self.getConstant(name_index);
     }
@@ -154,7 +156,7 @@ pub const ClassInfo = struct {
         }
     }
 
-    pub fn getMethodName(self: *ClassInfo, method: m.MethodInfo) ![]const u8 {
+    pub fn getMethodName(self: *ClassInfo, method: MethodInfo) ![]const u8 {
         const name_index = method.name_index;
         return self.getConstant(name_index);
     }

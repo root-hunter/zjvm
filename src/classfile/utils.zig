@@ -1,5 +1,8 @@
 const std = @import("std");
 const types = @import("types.zig");
+const AttributesInfo = @import("attributes.zig").AttributesInfo;
+const ClassInfo = @import("parser.zig").ClassInfo;
+const CodeAttribute = @import("code.zig").CodeAttribute;
 
 pub const Cursor = struct {
     buffer: []const u8,
@@ -56,3 +59,18 @@ pub const Cursor = struct {
         return bytes;
     }
 };
+
+pub fn parseCodeIfPresent(
+    attr: AttributesInfo,
+    class: *ClassInfo,
+    allocator: *std.mem.Allocator,
+) !?CodeAttribute {
+    const name = try class.getConstant(attr.attributeNameIndex);
+
+    if (std.mem.eql(u8, name, "Code")) {
+        var cursor = Cursor.init(attr.info);
+        return try CodeAttribute.parse(allocator, &cursor);
+    }
+
+    return null;
+}

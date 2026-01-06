@@ -2,6 +2,7 @@ const std = @import("std");
 const types = @import("types.zig");
 const cp = @import("constant_pool.zig");
 const utils = @import("utils.zig");
+const CodeAttribute = @import("code.zig").CodeAttribute;
 
 pub const AttributesInfo = struct {
     attribute_name_index: types.U2,

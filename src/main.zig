@@ -20,18 +20,6 @@ pub fn main() !void {
 
     try classInfo.parse(&cursor);
 
-    std.debug.print("Class file magic: {x}\n", .{classInfo.magic});
-    std.debug.print("Class file minor version: {d}\n", .{classInfo.minor_version});
-    std.debug.print("Class file major version: {d}\n", .{classInfo.major_version});
-    std.debug.print("Class file constant pool count: {d}\n", .{classInfo.constant_pool_count});
-    std.debug.print("Class file access flags: {x}\n", .{classInfo.access_flags});
-    std.debug.print("Class file this class index: {d}\n", .{classInfo.this_class});
-    std.debug.print("Class file super class index: {d}\n", .{classInfo.super_class});
-    std.debug.print("Class file interfaces count: {d}\n", .{classInfo.interfaces_count});
-    std.debug.print("Class file interfaces: {any}\n", .{classInfo.interfaces});
-    std.debug.print("Class file fields count: {d}\n", .{classInfo.fields_count});
-    std.debug.print("Class file attributes count: {d}\n", .{classInfo.attributes_count});
-
     try classInfo.dump();
 
     try zjvm.bufferedPrint();
