@@ -1,16 +1,5 @@
 const std = @import("std");
-
-fn readU1(r: []const u8) !u8 {
-    return std.mem.readInt(u8, r[0..1], .big);
-}
-
-fn readU2(r: []const u8) !u16 {
-    return std.mem.readInt(u16, r[0..2], .big);
-}
-
-fn readU4(r: []const u8) !u32 {
-    return std.mem.readInt(u32, r[0..4], .big);
-}
+const types = @import("types.zig");
 
 pub const ClassHeader = struct {
     magic: u32,
@@ -19,16 +8,66 @@ pub const ClassHeader = struct {
     pool_count: u16,
 };
 
-pub fn parseHeader(r: anytype) !ClassHeader {
-    const magic = try readU4(r);
+pub const Cursor = struct {
+    buffer: []const u8,
+    position: usize,
+
+    pub fn init(buffer: []const u8) Cursor {
+        return Cursor{
+            .buffer = buffer,
+            .position = 0,
+        };
+    }
+
+    pub fn readU1(self: *Cursor) !types.U1 {
+        if (self.position + 1 > self.buffer.len) {
+            return error.UnableToRead;
+        }
+        const value = self.buffer[self.position];
+        self.position += 1;
+        return value;
+    }
+
+    pub fn readU2(self: *Cursor) !types.U2 {
+        if (self.position + 2 > self.buffer.len) {
+            return error.UnableToRead;
+        }
+
+
+        const slice = self.buffer[self.position .. self.position + 2];
+        const arr_ptr: *const [2]u8 = @ptrCast(slice.ptr);
+
+        const value = std.mem.readInt(types.U2, arr_ptr, .big);
+        self.position += 2;
+        return value;
+    }
+
+    pub fn readU4(self: *Cursor) !types.U4 {
+        if (self.position + 4 > self.buffer.len) {
+            return error.UnableToRead;
+        }
+
+        const slice = self.buffer[self.position .. self.position + 4];
+        const arr_ptr: *const [4]u8 = @ptrCast(slice.ptr);
+
+        const value = std.mem.readInt(types.U4, arr_ptr, .big);
+        self.position += 4;
+        return value;
+    }
+};
+
+pub fn parseHeader(buffer: []const u8) !ClassHeader {
+    var c = Cursor.init(buffer);
+
+    const magic = try c.readU4();
     if (magic != 0xCAFEBABE)
         return error.InvalidClass;
 
     return .{
         .magic = magic,
-        .minor = try readU2(r),
-        .major = try readU2(r),
-        .pool_count = try readU2(r),
+        .minor = try c.readU2(),
+        .major = try c.readU2(),
+        .pool_count = try c.readU2(),
     };
 }
 

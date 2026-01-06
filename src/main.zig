@@ -1,21 +1,17 @@
 const std = @import("std");
 const zjvm = @import("zjvm");
-const types = @import("classfile/types.zig");
 const parser = @import("classfile/parser.zig");
 
 pub fn main() !void {
-    // Prints to stderr, ignoring potential errors.
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    const allocator = std.heap.page_allocator;
 
-    std.debug.print("Hello my name is Tony\n", .{});
-
-    var file = try std.fs.cwd().openFile("samples/Test.class", .{ .mode = std.fs.File.OpenMode.read_only });
+    var file = try std.fs.cwd().openFile("samples/Test.class", .{ .mode = .read_only });
     defer file.close();
 
-    var buffer: [1024]u8 = undefined;
-    _ = try file.readAll(buffer[0..]);
+    const file_size = try file.getEndPos();
+    const data = try file.readToEndAlloc(allocator, file_size);
 
-    const classFile = try parser.parseHeader(&buffer);
+    const classFile = try parser.parseHeader(data);
 
     std.debug.print("Class file magic: {x}\n", .{classFile.magic});
     std.debug.print("Class file minor version: {d}\n", .{classFile.minor});
