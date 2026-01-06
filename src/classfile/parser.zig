@@ -118,21 +118,17 @@ pub const ClassInfo = struct {
 
     pub fn parseFields(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.fields_count = try cursor.readU2();
-        const count: usize = @intCast(self.fields_count);
-        self.fields = try FieldInfo.parseAll(cursor, count, self.allocator);
+        self.fields = try FieldInfo.parseAll(cursor, @intCast(self.fields_count), self.allocator);
     }
 
     pub fn parseMethods(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.methods_count = try cursor.readU2();
-
-        const count: usize = @intCast(self.methods_count);
-        self.methods = try MethodInfo.parseAll(cursor, count, self.allocator);
+        self.methods = try MethodInfo.parseAll(self, cursor, @intCast(self.methods_count), self.allocator);
     }
 
     pub fn parseAttributes(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.attributes_count = try cursor.readU2();
-        const count: usize = @intCast(self.attributes_count);
-        self.attributes = try AttributesInfo.parseAll(cursor, count, self.allocator);
+        self.attributes = try AttributesInfo.parseAll(cursor, @intCast(self.attributes_count), self.allocator);
     }
 
     pub fn isValidMagicNumber(self: *ClassInfo) bool {
@@ -144,7 +140,7 @@ pub const ClassInfo = struct {
         return self.getConstant(name_index);
     }
 
-    pub fn getConstant(self: *ClassInfo, index: types.U2) ![]const u8 {
+    pub fn getConstant(self: *const ClassInfo, index: types.U2) ![]const u8 {
         if (self.constant_pool) |constantPool| {
             const cp_entry = constantPool[@intCast(index - 1)];
             return switch (cp_entry) {
@@ -190,8 +186,8 @@ pub const ClassInfo = struct {
 
         std.debug.print("Methods:\n", .{});
         if (self.methods) |methods| {
-            for (methods) |method| {
-                std.debug.print("  {s}\n", .{try self.getMethodName(method)});
+            for (methods) |tmethod| {
+                try tmethod.dump();
             }
         }
     }
