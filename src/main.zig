@@ -2,6 +2,7 @@ const std = @import("std");
 const zjvm = @import("zjvm");
 const parser = @import("classfile/parser.zig");
 const ac = @import("classfile/access_flags.zig");
+const utils = @import("classfile/utils.zig");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -12,7 +13,7 @@ pub fn main() !void {
     const file_size = try file.getEndPos();
     const data = try file.readToEndAlloc(allocator, file_size);
 
-    var cursor = parser.Cursor.init(data);
+    var cursor = utils.Cursor.init(data);
     var classInfo = parser.ClassInfo.init(&allocator);
     try classInfo.parse(&cursor);
 
