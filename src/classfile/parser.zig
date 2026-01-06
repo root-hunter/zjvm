@@ -3,122 +3,9 @@ const types = @import("types.zig");
 const cp = @import("constant_pool.zig");
 const ac = @import("access_flags.zig");
 const utils = @import("utils.zig");
-
-pub const AttributesInfo = struct {
-    attribute_name_index: types.U2,
-    attribute_length: types.U4,
-    info: []const u8,
-
-    pub fn parse(cursor: *utils.Cursor) !AttributesInfo {
-        const attributeNameIndex = try cursor.readU2();
-        const attributeLength = try cursor.readU4();
-        const info = try cursor.readBytes(@intCast(attributeLength));
-
-        return AttributesInfo{
-            .attribute_name_index = attributeNameIndex,
-            .attribute_length = attributeLength,
-            .info = info,
-        };
-    }
-
-    pub fn parseAll(cursor: *utils.Cursor, count: usize, allocator: *const std.mem.Allocator) ![]AttributesInfo {
-        var attributes = try allocator.alloc(AttributesInfo, count);
-
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
-            const attr = try AttributesInfo.parse(cursor);
-            attributes[i] = attr;
-        }
-
-        return attributes;
-    }
-};
-
-pub const FieldInfo = struct {
-    allocator: *const std.mem.Allocator,
-
-    access_flags: types.U2,
-    name_index: types.U2,
-    descriptor_index: types.U2,
-    attributes_count: types.U2,
-    attributes: ?[]AttributesInfo,
-
-    pub fn parse(allocator: *const std.mem.Allocator, cursor: *utils.Cursor) !FieldInfo {
-        var self = FieldInfo{
-            .allocator = allocator,
-            .access_flags = 0,
-            .name_index = 0,
-            .descriptor_index = 0,
-            .attributes_count = 0,
-            .attributes = null,
-        };
-
-        self.access_flags = try cursor.readU2();
-        self.name_index = try cursor.readU2();
-        self.descriptor_index = try cursor.readU2();
-        self.attributes_count = try cursor.readU2();
-
-        const count: usize = @intCast(self.attributes_count);
-        self.attributes = try AttributesInfo.parseAll(cursor, count, self.allocator);
-
-        return self;
-    }
-
-    pub fn parseAll(cursor: *utils.Cursor, count: usize, allocator: *const std.mem.Allocator) ![]FieldInfo {
-        var fields = try allocator.alloc(FieldInfo, count);
-
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
-            const field = try FieldInfo.parse(allocator, cursor);
-            fields[i] = field;
-        }
-
-        return fields;
-    }
-};
-
-pub const MethodInfo = struct {
-    allocator: *const std.mem.Allocator,
-
-    access_flags: types.U2,
-    name_index: types.U2,
-    descriptor_index: types.U2,
-    attributes_count: types.U2,
-    attributes: ?[]AttributesInfo,
-
-    pub fn parse(allocator: *const std.mem.Allocator, cursor: *utils.Cursor) !MethodInfo {
-        var self = MethodInfo{
-            .allocator = allocator,
-            .access_flags = 0,
-            .name_index = 0,
-            .descriptor_index = 0,
-            .attributes_count = 0,
-            .attributes = null,
-        };
-
-        self.access_flags = try cursor.readU2();
-        self.name_index = try cursor.readU2();
-        self.descriptor_index = try cursor.readU2();
-        self.attributes_count = try cursor.readU2();
-
-        const count: usize = @intCast(self.attributes_count);
-        self.attributes = try AttributesInfo.parseAll(cursor, count, self.allocator);
-
-        return self;
-    }
-
-    pub fn parseAll(cursor: *utils.Cursor, count: usize, allocator: *const std.mem.Allocator) ![]MethodInfo {
-        var methods = try allocator.alloc(MethodInfo, count);
-
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
-            const method = try MethodInfo.parse(allocator, cursor);
-            methods[i] = method;
-        }
-
-        return methods;
-    }
-};
+const a = @import("attributes.zig");
+const f = @import("fields.zig");
+const m = @import("methods.zig");
 
 pub const ClassInfo = struct {
     allocator: *const std.mem.Allocator,
@@ -138,13 +25,13 @@ pub const ClassInfo = struct {
     interfaces: ?[]types.U2,
 
     fields_count: types.U2,
-    fields: ?[]FieldInfo,
+    fields: ?[]f.FieldInfo,
 
     methods_count: types.U2,
-    methods: ?[]MethodInfo,
+    methods: ?[]m.MethodInfo,
 
     attributes_count: types.U2,
-    attributes: ?[]AttributesInfo,
+    attributes: ?[]a.AttributesInfo,
 
     pub fn init(allocator: *const std.mem.Allocator) ClassInfo {
         return ClassInfo{
@@ -220,27 +107,27 @@ pub const ClassInfo = struct {
     pub fn parseFields(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.fields_count = try cursor.readU2();
         const count: usize = @intCast(self.fields_count);
-        self.fields = try FieldInfo.parseAll(cursor, count, self.allocator);
+        self.fields = try f.FieldInfo.parseAll(cursor, count, self.allocator);
     }
 
     pub fn parseMethods(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.methods_count = try cursor.readU2();
 
         const count: usize = @intCast(self.methods_count);
-        self.methods = try MethodInfo.parseAll(cursor, count, self.allocator);
+        self.methods = try m.MethodInfo.parseAll(cursor, count, self.allocator);
     }
 
     pub fn parseAttributes(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.attributes_count = try cursor.readU2();
         const count: usize = @intCast(self.attributes_count);
-        self.attributes = try AttributesInfo.parseAll(cursor, count, self.allocator);
+        self.attributes = try a.AttributesInfo.parseAll(cursor, count, self.allocator);
     }
 
     pub fn isValidMagicNumber(self: *ClassInfo) bool {
         return self.magic == 0xCAFEBABE;
     }
 
-    pub fn getFieldName(self: *ClassInfo, field: FieldInfo) ![]const u8 {
+    pub fn getFieldName(self: *ClassInfo, field: f.FieldInfo) ![]const u8 {
         const name_index = field.name_index;
         return self.getConstant(name_index);
     }
@@ -257,7 +144,7 @@ pub const ClassInfo = struct {
         }
     }
 
-    pub fn getMethodName(self: *ClassInfo, method: MethodInfo) ![]const u8 {
+    pub fn getMethodName(self: *ClassInfo, method: m.MethodInfo) ![]const u8 {
         const name_index = method.name_index;
         return self.getConstant(name_index);
     }

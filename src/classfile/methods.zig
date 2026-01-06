@@ -1,0 +1,47 @@
+const std = @import("std");
+const types = @import("types.zig");
+const utils = @import("utils.zig");
+const a = @import("attributes.zig");
+
+pub const MethodInfo = struct {
+    allocator: *const std.mem.Allocator,
+
+    access_flags: types.U2,
+    name_index: types.U2,
+    descriptor_index: types.U2,
+    attributes_count: types.U2,
+    attributes: ?[]a.AttributesInfo,
+
+    pub fn parse(allocator: *const std.mem.Allocator, cursor: *utils.Cursor) !MethodInfo {
+        var self = MethodInfo{
+            .allocator = allocator,
+            .access_flags = 0,
+            .name_index = 0,
+            .descriptor_index = 0,
+            .attributes_count = 0,
+            .attributes = null,
+        };
+
+        self.access_flags = try cursor.readU2();
+        self.name_index = try cursor.readU2();
+        self.descriptor_index = try cursor.readU2();
+        self.attributes_count = try cursor.readU2();
+
+        const count: usize = @intCast(self.attributes_count);
+        self.attributes = try a.AttributesInfo.parseAll(cursor, count, self.allocator);
+
+        return self;
+    }
+
+    pub fn parseAll(cursor: *utils.Cursor, count: usize, allocator: *const std.mem.Allocator) ![]MethodInfo {
+        var methods = try allocator.alloc(MethodInfo, count);
+
+        var i: usize = 0;
+        while (i < count) : (i += 1) {
+            const method = try MethodInfo.parse(allocator, cursor);
+            methods[i] = method;
+        }
+
+        return methods;
+    }
+};
