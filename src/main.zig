@@ -12,19 +12,36 @@ pub fn main() !void {
     const data = try file.readToEndAlloc(allocator, file_size);
 
     var cursor = parser.Cursor.init(data);
-    var classHeader = parser.ClassFile.init();
-    try classHeader.parse(&cursor);
+    var classInfo = parser.ClassInfo.init(&allocator);
+    try classInfo.parse(&cursor);
 
-    std.debug.print("Class file magic: {x}\n", .{classHeader.magic});
-    std.debug.print("Class file minor version: {d}\n", .{classHeader.minor});
-    std.debug.print("Class file major version: {d}\n", .{classHeader.major});
-    std.debug.print("Class file constant pool count: {d}\n", .{classHeader.constantPoolCount});
+    std.debug.print("Class file magic: {x}\n", .{classInfo.magic});
+    std.debug.print("Class file minor version: {d}\n", .{classInfo.minor});
+    std.debug.print("Class file major version: {d}\n", .{classInfo.major});
+    std.debug.print("Class file constant pool count: {d}\n", .{classInfo.constant_pool_count});
+    std.debug.print("Class file access flags: {x}\n", .{classInfo.access_flags});
+    std.debug.print("Class file this class index: {d}\n", .{classInfo.this_class});
+    std.debug.print("Class file super class index: {d}\n", .{classInfo.super_class});
+    std.debug.print("Class file interfaces count: {d}\n", .{classInfo.interfaces_count});
+    std.debug.print("Class file interfaces: {any}\n", .{classInfo.interfaces});
+    std.debug.print("Class file fields count: {d}\n", .{classInfo.fields_count});
+    std.debug.print("Class file attributes count: {d}\n", .{classInfo.attributes_count});
 
     // print all constant pool entries
 
-    if (classHeader.constantPool) |constantPool| {
+    if (classInfo.constant_pool) |constantPool| {
         for (constantPool) |entry| {
             std.debug.print("Constant Pool Entry: {s}\n", .{entry.toString()});
+        }
+    }
+
+    // print all fields
+
+    if (classInfo.fields) |fields| {
+        for (fields) |field| {
+            std.debug.print("Field: name_index={d}, descriptor_index={d}, access_flags={x}\n", .{ field.name_index, field.descriptor_index, field.access_flags });
+
+            std.debug.print("Field Name: {s}\n", .{try classInfo.getFieldName(field)});
         }
     }
 
