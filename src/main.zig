@@ -46,7 +46,6 @@ pub fn main() !void {
     }
 
     // print all constant pool entries
-
     if (classInfo.constant_pool) |constantPool| {
         for (constantPool) |entry| {
             std.debug.print("Constant Pool Entry: {s}\n", .{entry.toString()});
@@ -54,7 +53,6 @@ pub fn main() !void {
     }
 
     // print all fields
-
     if (classInfo.fields) |fields| {
         for (fields) |field| {
             std.debug.print("Field: name_index={d}, descriptor_index={d}, access_flags={x}\n", .{ field.name_index, field.descriptor_index, field.access_flags });
@@ -63,16 +61,22 @@ pub fn main() !void {
     }
 
     // print all methods
-
     if (classInfo.methods) |methods| {
         for (methods) |method| {
             std.debug.print("Method: name_index={d}, descriptor_index={d}, access_flags={x}\n", .{ method.name_index, method.descriptor_index, method.access_flags });
             std.debug.print("Method Name: {s}\n", .{try classInfo.getMethodName(method)});
+
+            if (ac.MethodAccessFlags.isPublic(method.access_flags)) {
+                std.debug.print("The method is public.\n", .{});
+            }
+
+            if (ac.MethodAccessFlags.isPrivate(method.access_flags)) {
+                std.debug.print("The method is private.\n", .{});
+            }
         }
     }
 
     // print all attributes
-
     if (classInfo.attributes) |attributes| {
         for (attributes) |attribute| {
             std.debug.print("Attribute: name_index={d}, length={d}\n", .{ attribute.attribute_name_index, attribute.attribute_length });
