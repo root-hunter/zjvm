@@ -79,8 +79,18 @@ pub const ClassInfo = struct {
         self.constant_pool = try self.allocator.alloc(cp.ConstantPoolInfo, pool_size);
 
         var i: usize = 0;
-        while (i < pool_size) : (i += 1) {
-            self.constant_pool.?[i] = try cp.ConstantPoolInfo.parse(cursor);
+        while (i < pool_size) {
+            const entry = try cp.ConstantPoolInfo.parse(cursor);
+            self.constant_pool.?[i] = entry;
+
+            switch (entry) {
+                .Long, .Double => {
+                    i += 2; // slot extra "vuoto"
+                },
+                else => {
+                    i += 1;
+                },
+            }
         }
     }
 
@@ -147,5 +157,67 @@ pub const ClassInfo = struct {
     pub fn getMethodName(self: *ClassInfo, method: m.MethodInfo) ![]const u8 {
         const name_index = method.name_index;
         return self.getConstant(name_index);
+    }
+
+    pub fn getClassName(self: *ClassInfo) ![]const u8 {
+        const class_cp = self.constant_pool.?[@intCast(self.this_class - 1)];
+        return switch (class_cp) {
+            .Class => |name_index| self.getConstant(name_index),
+            else => error.InvalidClassInfo,
+        };
+    }
+
+    pub fn getSuperClassName(self: *ClassInfo) ![]const u8 {
+        const super_cp = self.constant_pool.?[@intCast(self.super_class - 1)];
+        return switch (super_cp) {
+            .Class => |name_index| self.getConstant(name_index),
+            else => error.InvalidClassInfo,
+        };
+    }
+
+    pub fn dump(self: *ClassInfo) !void {
+        std.debug.print("Class: {s}\n", .{try self.getClassName()});
+        std.debug.print("Super: {s}\n", .{try self.getSuperClassName()});
+        std.debug.print("Fields:\n", .{});
+
+        if (self.fields) |fields| {
+            for (fields) |field| {
+                std.debug.print("  {s}\n", .{try self.getFieldName(field)});
+            }
+        }
+
+        std.debug.print("Methods:\n", .{});
+        if (self.methods) |methods| {
+            for (methods) |method| {
+                std.debug.print("  {s}\n", .{try self.getMethodName(method)});
+            }
+        }
+    }
+
+    pub fn deinit(self: *ClassInfo) void {
+        if (self.constant_pool) |constantPool| {
+            self.allocator.free(constantPool);
+            self.constant_pool = null;
+        }
+
+        if (self.interfaces) |interfaces| {
+            self.allocator.free(interfaces);
+            self.interfaces = null;
+        }
+
+        if (self.fields) |fields| {
+            self.allocator.free(fields);
+            self.fields = null;
+        }
+
+        if (self.methods) |methods| {
+            self.allocator.free(methods);
+            self.methods = null;
+        }
+
+        if (self.attributes) |attributes| {
+            self.allocator.free(attributes);
+            self.attributes = null;
+        }
     }
 };

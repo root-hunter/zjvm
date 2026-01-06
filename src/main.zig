@@ -12,9 +12,12 @@ pub fn main() !void {
 
     const file_size = try file.getEndPos();
     const data = try file.readToEndAlloc(allocator, file_size);
+    defer allocator.free(data);
 
     var cursor = utils.Cursor.init(data);
     var classInfo = parser.ClassInfo.init(&allocator);
+    defer classInfo.deinit();
+
     try classInfo.parse(&cursor);
 
     std.debug.print("Class file magic: {x}\n", .{classInfo.magic});
@@ -29,59 +32,7 @@ pub fn main() !void {
     std.debug.print("Class file fields count: {d}\n", .{classInfo.fields_count});
     std.debug.print("Class file attributes count: {d}\n", .{classInfo.attributes_count});
 
-    if (ac.ClassAccessFlags.isPublic(classInfo.access_flags)) {
-        std.debug.print("The class is public.\n", .{});
-    }
-
-    if (ac.ClassAccessFlags.isFinal(classInfo.access_flags)) {
-        std.debug.print("The class is final.\n", .{});
-    }
-
-    if (ac.ClassAccessFlags.isAbstract(classInfo.access_flags)) {
-        std.debug.print("The class is abstract.\n", .{});
-    }
-
-    if (ac.ClassAccessFlags.isInterface(classInfo.access_flags)) {
-        std.debug.print("The class is an interface.\n", .{});
-    }
-
-    // print all constant pool entries
-    if (classInfo.constant_pool) |constantPool| {
-        for (constantPool) |entry| {
-            std.debug.print("Constant Pool Entry: {s}\n", .{entry.toString()});
-        }
-    }
-
-    // print all fields
-    if (classInfo.fields) |fields| {
-        for (fields) |field| {
-            std.debug.print("Field: name_index={d}, descriptor_index={d}, access_flags={x}\n", .{ field.name_index, field.descriptor_index, field.access_flags });
-            std.debug.print("Field Name: {s}\n", .{try classInfo.getFieldName(field)});
-        }
-    }
-
-    // print all methods
-    if (classInfo.methods) |methods| {
-        for (methods) |method| {
-            std.debug.print("Method: name_index={d}, descriptor_index={d}, access_flags={x}\n", .{ method.name_index, method.descriptor_index, method.access_flags });
-            std.debug.print("Method Name: {s}\n", .{try classInfo.getMethodName(method)});
-
-            if (ac.MethodAccessFlags.isPublic(method.access_flags)) {
-                std.debug.print("The method is public.\n", .{});
-            }
-
-            if (ac.MethodAccessFlags.isPrivate(method.access_flags)) {
-                std.debug.print("The method is private.\n", .{});
-            }
-        }
-    }
-
-    // print all attributes
-    if (classInfo.attributes) |attributes| {
-        for (attributes) |attribute| {
-            std.debug.print("Attribute: name_index={d}, length={d}\n", .{ attribute.attribute_name_index, attribute.attribute_length });
-        }
-    }
+    try classInfo.dump();
 
     try zjvm.bufferedPrint();
 }
