@@ -213,6 +213,18 @@ pub const FieldInfo = struct {
 
         return self;
     }
+
+    pub fn parseAll(cursor: *Cursor, count: usize, allocator: *const std.mem.Allocator) ![]FieldInfo {
+        var fields = try allocator.alloc(FieldInfo, count);
+
+        var i: usize = 0;
+        while (i < count) : (i += 1) {
+            const field = try FieldInfo.parse(allocator, cursor);
+            fields[i] = field;
+        }
+
+        return fields;
+    }
 };
 
 pub const MethodInfo = struct {
@@ -243,6 +255,18 @@ pub const MethodInfo = struct {
         self.attributes = try AttributesInfo.parseAll(cursor, count, self.allocator);
 
         return self;
+    }
+
+    pub fn parseAll(cursor: *Cursor, count: usize, allocator: *const std.mem.Allocator) ![]MethodInfo {
+        var methods = try allocator.alloc(MethodInfo, count);
+
+        var i: usize = 0;
+        while (i < count) : (i += 1) {
+            const method = try MethodInfo.parse(allocator, cursor);
+            methods[i] = method;
+        }
+
+        return methods;
     }
 };
 
@@ -346,26 +370,14 @@ pub const ClassInfo = struct {
     pub fn parseFields(self: *ClassInfo, cursor: *Cursor) !void {
         self.fields_count = try cursor.readU2();
         const count: usize = @intCast(self.fields_count);
-        self.fields = try self.allocator.alloc(FieldInfo, count);
-
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
-            const field = try FieldInfo.parse(self.allocator, cursor);
-            self.fields.?[i] = field;
-        }
+        self.fields = try FieldInfo.parseAll(cursor, count, self.allocator);
     }
 
     pub fn parseMethods(self: *ClassInfo, cursor: *Cursor) !void {
         self.methods_count = try cursor.readU2();
 
         const count: usize = @intCast(self.methods_count);
-        self.methods = try self.allocator.alloc(MethodInfo, count);
-
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
-            const method = try MethodInfo.parse(self.allocator, cursor);
-            self.methods.?[i] = method;
-        }
+        self.methods = try MethodInfo.parseAll(cursor, count, self.allocator);
     }
 
     pub fn parseAttributes(self: *ClassInfo, cursor: *Cursor) !void {
