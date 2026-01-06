@@ -170,6 +170,18 @@ pub const AttributesInfo = struct {
             .info = info,
         };
     }
+
+    pub fn parseAll(cursor: *Cursor, count: usize, allocator: *const std.mem.Allocator) ![]AttributesInfo {
+        var attributes = try allocator.alloc(AttributesInfo, count);
+
+        var i: usize = 0;
+        while (i < count) : (i += 1) {
+            const attr = try AttributesInfo.parse(cursor);
+            attributes[i] = attr;
+        }
+
+        return attributes;
+    }
 };
 
 pub const FieldInfo = struct {
@@ -197,13 +209,7 @@ pub const FieldInfo = struct {
         self.attributes_count = try cursor.readU2();
 
         const count: usize = @intCast(self.attributes_count);
-        self.attributes = try self.allocator.alloc(AttributesInfo, count);
-
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
-            const attr = try AttributesInfo.parse(cursor);
-            self.attributes.?[i] = attr;
-        }
+        self.attributes = try AttributesInfo.parseAll(cursor, count, self.allocator);
 
         return self;
     }
@@ -234,13 +240,7 @@ pub const MethodInfo = struct {
         self.attributes_count = try cursor.readU2();
 
         const count: usize = @intCast(self.attributes_count);
-        self.attributes = try self.allocator.alloc(AttributesInfo, count);
-
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
-            const attr = try AttributesInfo.parse(cursor);
-            self.attributes.?[i] = attr;
-        }
+        self.attributes = try AttributesInfo.parseAll(cursor, count, self.allocator);
 
         return self;
     }
@@ -250,8 +250,8 @@ pub const ClassInfo = struct {
     allocator: *const std.mem.Allocator,
 
     magic: types.U4,
-    minor: types.U2,
-    major: types.U2,
+    minor_version: types.U2,
+    major_version: types.U2,
     constant_pool_count: types.U2,
     constant_pool: ?[]ConstantPoolInfo,
 
@@ -277,8 +277,8 @@ pub const ClassInfo = struct {
             .allocator = allocator,
 
             .magic = 0,
-            .minor = 0,
-            .major = 0,
+            .minor_version = 0,
+            .major_version = 0,
             .constant_pool_count = 0,
             .constant_pool = null,
             .access_flags = 0,
@@ -308,8 +308,8 @@ pub const ClassInfo = struct {
 
     pub fn parseHeaders(self: *ClassInfo, cursor: *Cursor) !void {
         self.magic = try cursor.readU4();
-        self.minor = try cursor.readU2();
-        self.major = try cursor.readU2();
+        self.minor_version = try cursor.readU2();
+        self.major_version = try cursor.readU2();
         self.constant_pool_count = try cursor.readU2();
     }
 
@@ -371,13 +371,7 @@ pub const ClassInfo = struct {
     pub fn parseAttributes(self: *ClassInfo, cursor: *Cursor) !void {
         self.attributes_count = try cursor.readU2();
         const count: usize = @intCast(self.attributes_count);
-        self.attributes = try self.allocator.alloc(AttributesInfo, count);
-
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
-            const attr = try AttributesInfo.parse(cursor);
-            self.attributes.?[i] = attr;
-        }
+        self.attributes = try AttributesInfo.parseAll(cursor, count, self.allocator);
     }
 
     pub fn isValidMagicNumber(self: *ClassInfo) bool {
