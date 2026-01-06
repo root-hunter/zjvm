@@ -11,11 +11,22 @@ pub fn main() !void {
     const file_size = try file.getEndPos();
     const data = try file.readToEndAlloc(allocator, file_size);
 
-    const classFile = try parser.parseHeader(data);
+    var cursor = parser.Cursor.init(data);
+    var classHeader = parser.ClassFile.init();
+    try classHeader.parse(&cursor);
 
-    std.debug.print("Class file magic: {x}\n", .{classFile.magic});
-    std.debug.print("Class file minor version: {d}\n", .{classFile.minor});
-    std.debug.print("Class file major version: {d}\n", .{classFile.major});
+    std.debug.print("Class file magic: {x}\n", .{classHeader.magic});
+    std.debug.print("Class file minor version: {d}\n", .{classHeader.minor});
+    std.debug.print("Class file major version: {d}\n", .{classHeader.major});
+    std.debug.print("Class file constant pool count: {d}\n", .{classHeader.constantPoolCount});
+
+    // print all constant pool entries
+
+    if (classHeader.constantPool) |constantPool| {
+        for (constantPool) |entry| {
+            std.debug.print("Constant Pool Entry: {s}\n", .{entry.toString()});
+        }
+    }
 
     try zjvm.bufferedPrint();
 }
