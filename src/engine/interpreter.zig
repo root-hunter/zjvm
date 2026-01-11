@@ -53,6 +53,11 @@ pub const JVMInterpreter = struct {
                     try frame.operand_stack.push(value);
                     frame.pc += opcode.getOperandLength();
                 },
+                OpcodeEnum.ILoad3 => { // iload_3
+                    const value = frame.local_vars.vars[3];
+                    try frame.operand_stack.push(value);
+                    frame.pc += opcode.getOperandLength();
+                },
                 OpcodeEnum.ISub => { // isub
                     const b = (try frame.operand_stack.pop()).Int;
                     const a = (try frame.operand_stack.pop()).Int;
@@ -79,6 +84,13 @@ pub const JVMInterpreter = struct {
                     const element = arrayref.?.*[index];
                     try frame.operand_stack.push(element);
                     frame.pc += 1;
+                },
+                OpcodeEnum.IStore => { // istore
+                    const index_byte = frame.code[frame.pc + 1];
+                    const index: usize = @intCast(index_byte);
+                    const value = try frame.operand_stack.pop();
+                    frame.local_vars.vars[index] = value;
+                    frame.pc += opcode.getOperandLength();
                 },
                 OpcodeEnum.IStore1 => { // istore_1
                     const value = try frame.operand_stack.pop();
