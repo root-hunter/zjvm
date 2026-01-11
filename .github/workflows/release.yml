@@ -9,47 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
-    
-    steps:
-    - name: Get version from tag
-      id: get_version
-      run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-    
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ steps.get_version.outputs.version }}
-        draft: false
-        prerelease: false
-        body: |
-          ## ZJVM Release ${{ steps.get_version.outputs.version }}
-          
-          ### Downloads
-          - **Linux**: zjvm-linux-x86_64
-          - **macOS**: zjvm-macos-x86_64
-          - **Windows**: zjvm-windows-x86_64.exe
-          
-          ### Installation
-          1. Download the appropriate binary for your platform
-          2. Make it executable (Linux/macOS): `chmod +x zjvm-*`
-          3. Run: `./zjvm-*` (or `zjvm-windows-x86_64.exe` on Windows)
-          
-          ### What's Changed
-          See the [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
-
-  build-and-upload:
+  build-and-release:
     name: Build on ${{ matrix.os }}
-    needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -120,11 +81,20 @@ jobs:
         copy zig-out\bin\${{ matrix.artifact_name }} ${{ matrix.asset_name }}
     
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./${{ matrix.asset_name }}
-        asset_name: ${{ matrix.asset_name }}
-        asset_content_type: application/octet-stream
+        files: ${{ matrix.asset_name }}
+        body: |
+          ## ZJVM Release ${{ github.ref_name }}
+          
+          ### Downloads
+          Download the appropriate binary for your platform from the assets below.
+          
+          ### Installation
+          1. Download the binary for your platform
+          2. Make it executable (Linux/macOS): `chmod +x zjvm-*`
+          3. Run: `./zjvm-*` (or `zjvm-windows-x86_64.exe` on Windows)
+          
+          ### What's Changed
+          See the [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
+
