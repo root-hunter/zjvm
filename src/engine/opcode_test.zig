@@ -39,15 +39,13 @@ test "Opcode - bipush" {
     try testing.expectEqual(@as(u8, 0x10), @intFromEnum(OpcodeEnum.BiPush));
 }
 
-
-
 test "Opcode - from byte conversion" {
     const op: OpcodeEnum = @enumFromInt(0x10);
     try testing.expectEqual(OpcodeEnum.BiPush, op);
-    
+
     const op2: OpcodeEnum = @enumFromInt(0x60);
     try testing.expectEqual(OpcodeEnum.IAdd, op2);
-    
+
     const op3: OpcodeEnum = @enumFromInt(0xB1);
     try testing.expectEqual(OpcodeEnum.Return, op3);
 }

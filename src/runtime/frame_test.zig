@@ -108,3 +108,23 @@ test "Frame - code reference is correct" {
     try testing.expectEqual(@as(u8, 0xCC), frame.code[2]);
     try testing.expectEqual(@as(u8, 0xDD), frame.code[3]);
 }
+
+test "Frame - modify PC and verify" {
+    const allocator = testing.allocator;
+
+    const code = [_]u8{ 0x10, 0x20, 0x30, 0x40 };
+    const codeAttr = ca.CodeAttribute{
+        .max_stack = 4,
+        .max_locals = 4,
+        .code = &code,
+        .exception_table = &[_]ca.ExceptionTableEntry{},
+        .attributes = &[_]AttributesInfo{},
+    };
+
+    var frame = try Frame.init(&allocator, codeAttr);
+    defer allocator.free(frame.operand_stack.data);
+    defer allocator.free(frame.local_vars.vars);
+
+    frame.pc = 2;
+    try testing.expectEqual(@as(usize, 2), frame.pc);
+}
