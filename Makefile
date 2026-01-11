@@ -1,4 +1,4 @@
-RELEASE_VERSION = 0.1.5
+RELEASE_VERSION = 0.1.6
 RELEASE_MODE ?= safe
 
 build-samples:
@@ -40,6 +40,6 @@ publish-release: build-zjvm test
 	@echo "Pushing ZJVM to remote repository..."
 	git add .
 	git tag -a "$(RELEASE_VERSION)" -m "Release version $(RELEASE_VERSION)"
-	git commit -m "Update ZJVM to version $(VERSION)"
-	git push origin main --tags
+	git commit -m "Update ZJVM to version $(RELEASE_VERSION)"
+	git push origin ${RELEASE_VERSION}
 	@echo "ZJVM pushed to remote repository."
