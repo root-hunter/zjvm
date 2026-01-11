@@ -35,7 +35,7 @@ pub fn main() !void {
             codeAttr.dump();
 
             std.debug.print("Starting execution of 'main'...\n", .{});
-            std.debug.print("Code Op: {any}\n", .{codeAttr.code});
+            codeAttr.dumpOpcodes();
 
             var frame = try fr.Frame.init(&allocator, codeAttr);
             try JVMInterpreter.execute(&frame);

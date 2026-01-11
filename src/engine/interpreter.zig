@@ -36,6 +36,10 @@ pub const JVMInterpreter = struct {
                     frame.pc += 1;
                     try frame.operand_stack.push(Value{ .Int = @intCast(byte) });
                 },
+                OpcodeEnum.LLoad3 => { // lload_3
+                    const value = frame.local_vars.vars[3];
+                    try frame.operand_stack.push(value);
+                },
                 OpcodeEnum.IStore1 => { // istore_1
                     const value = try frame.operand_stack.pop();
                     frame.local_vars.vars[1] = value;

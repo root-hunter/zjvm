@@ -3,6 +3,7 @@ const types = @import("types.zig");
 const Cursor = @import("utils.zig").Cursor;
 const AttributesInfo = @import("attributes.zig").AttributesInfo;
 const p = @import("parser.zig");
+const OpcodeEnum = @import("../engine/opcode.zig").OpcodeEnum;
 
 pub const ExceptionTableEntry = struct {
     start_pc: types.U2,
@@ -84,6 +85,23 @@ pub const CodeAttribute = struct {
         std.debug.print("      Code Length: {}\n", .{code_len});
         std.debug.print("      Exception Table Length: {}\n", .{self.exception_table.len});
         std.debug.print("      Attributes Count: {}\n", .{self.attributes.len});
+    }
+
+    pub fn dumpOpcodes(self: *const CodeAttribute) void {
+        std.debug.print("    Raw Opcodes: {any}\n", .{self.code});
+        std.debug.print("      Opcodes:\n", .{});
+        var i: usize = 0;
+        while (i < self.code.len) : (i += 1) {
+            const opcode = self.code[i];
+            const opcode_enum: ?OpcodeEnum = @enumFromInt(opcode);
+
+            if (opcode_enum == null) {
+                std.debug.print("        {d}: Unknown Opcode {x}\n", .{ i, opcode });
+                continue;
+            }
+
+            std.debug.print("        {d}: {s}\n", .{ i, opcode_enum.?.toString() });
+        }
     }
 
     pub fn deinit(self: *CodeAttribute, allocator: *const std.mem.Allocator) void {
