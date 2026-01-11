@@ -1,4 +1,5 @@
-RELEASE_VERSION = v0.1.7
+# Extract version from build.zig.zon
+RELEASE_VERSION = $(shell grep -oP '\.version = "\K[^"]+' build.zig.zon)
 RELEASE_MODE ?= safe
 
 build-samples:
@@ -39,7 +40,10 @@ run-release: build-zjvm-release
 publish-release: build-zjvm test
 	@echo "Pushing ZJVM to remote repository..."
 	git add .
-	git tag -a "$(RELEASE_VERSION)" -m "Release version $(RELEASE_VERSION)"
-	git commit -m "Update ZJVM to version $(RELEASE_VERSION)"
-	git push origin ${RELEASE_VERSION}
+	git tag -a "v$(RELEASE_VERSION)" -m "Release version v$(RELEASE_VERSION)"
+	git commit -m "Update ZJVM to version v$(RELEASE_VERSION)"
+	git push origin v$(RELEASE_VERSION)
 	@echo "ZJVM pushed to remote repository."
+
+print-version:
+	@echo "ZJVM Version: $(RELEASE_VERSION)"
