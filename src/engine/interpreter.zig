@@ -172,8 +172,6 @@ pub const JVMInterpreter = struct {
                 },
             }
 
-            frame.dump();
-
             frame.pc += opcode.getOperandLength();
         }
     }

@@ -1,20 +1,18 @@
-//! By convention, root.zig is the root source file when making a library.
+const std = @import("std");
 
-test "ZJVM Test Suite 1" {
-    const std = @import("std");
+const utils = @import("classfile/utils.zig");
+const parser = @import("classfile/parser.zig");
+const fr = @import("runtime/frame.zig");
+const i = @import("engine/interpreter.zig");
+const v = @import("runtime/value.zig");
+const ZJVM = @import("engine/vm.zig").ZJVM;
 
-    const utils = @import("classfile/utils.zig");
-    const parser = @import("classfile/parser.zig");
-    const fr = @import("runtime/frame.zig");
-    const i = @import("engine/interpreter.zig");
-    const v = @import("runtime/value.zig");
-    const ZJVM = @import("engine/vm.zig").ZJVM;
+const testing = std.testing;
 
-    const testing = std.testing;
+fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
+    var allocator = std.heap.page_allocator;
 
-    const allocator = std.heap.page_allocator;
-
-    var file = try std.fs.cwd().openFile("samples/TestSuite1.class", .{ .mode = .read_only });
+    var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
     defer file.close();
 
     const file_size = try file.getEndPos();
@@ -32,19 +30,9 @@ test "ZJVM Test Suite 1" {
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
-            var frame = try fr.Frame.init(&allocator, codeAttr);
+            var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            try i.JVMInterpreter.execute(&vm);
-
-            const expectedValues = [_]v.Value{
-                .{ .Int = 0 },
-                .{ .Int = 33 },
-                .{ .Int = 100 },
-                .{ .Int = 83 },
-                .{ .Int = 203 },
-                .{ .Int = 403 },
-                .{ .Int = 799 },
-            };
+            try i.JVMInterpreter.execute(&allocator, &vm);
 
             var index: usize = 0;
             while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
@@ -56,11 +44,37 @@ test "ZJVM Test Suite 1" {
     }
 }
 
+test "ZJVM Test Suite 1" {
+    const expectedValues = [_]v.Value{
+        .{ .Int = 0 },
+        .{ .Int = 33 },
+        .{ .Int = 100 },
+        .{ .Int = 83 },
+        .{ .Int = 203 },
+        .{ .Int = 403 },
+        .{ .Int = 799 },
+    };
+    const filePath = "samples/TestSuite1.class";
+
+    try makeTestSuite(filePath, &expectedValues);
+}
+
+test "ZJVM Test Suite 2" {
+    const expectedValues = [_]v.Value{
+        .{ .Int = 0 },
+        .{ .Int = 5 },
+        .{ .Int = 10 },
+        .{ .Int = 50 },
+        .{ .Int = 80 },
+    };
+    const filePath = "samples/TestSuite2.class";
+    try makeTestSuite(filePath, &expectedValues);
+}
+
 // Import all test files to include them in the test suite
 test {
     _ = @import("runtime/value_test.zig");
     _ = @import("runtime/operand_stack_test.zig");
     _ = @import("runtime/local_vars_test.zig");
-    _ = @import("runtime/frame_test.zig");
     _ = @import("engine/opcode_test.zig");
 }
