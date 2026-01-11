@@ -85,4 +85,9 @@ pub const CodeAttribute = struct {
         std.debug.print("      Exception Table Length: {}\n", .{self.exception_table.len});
         std.debug.print("      Attributes Count: {}\n", .{self.attributes.len});
     }
+
+    pub fn deinit(self: *CodeAttribute, allocator: *const std.mem.Allocator) void {
+        allocator.free(self.exception_table);
+        allocator.free(self.attributes);
+    }
 };

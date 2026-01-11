@@ -54,4 +54,10 @@ pub const FieldInfo = struct {
 
         return fields;
     }
+
+    pub fn deinit(self: *FieldInfo) void {
+        if (self.attributes) |attrs| {
+            self.allocator.free(attrs);
+        }
+    }
 };

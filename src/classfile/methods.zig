@@ -89,4 +89,16 @@ pub const MethodInfo = struct {
             std.debug.print("  No code attribute\n", .{});
         }
     }
+
+    pub fn deinit(self: *MethodInfo) void {
+        if (self.attributes) |attributes| {
+            self.allocator.free(attributes);
+            self.attributes = null;
+        }
+
+        if (self.code) |code| {
+            code.deinit();
+            self.code = null;
+        }
+    }
 };
