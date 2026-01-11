@@ -1,4 +1,6 @@
 pub const OpcodeEnum = enum(u8) {
+    Nop = 0x00,
+    DConst0 = 0x0e,
     IConstM1 = 0x02,
     IConst0 = 0x03,
     IConst1 = 0x04,
@@ -7,6 +9,7 @@ pub const OpcodeEnum = enum(u8) {
     IConst4 = 0x07,
     IConst5 = 0x08,
     BiPush = 0x10,
+    SiPush = 0x11,
     ILoad = 0x15,
     ILoad0 = 0x1a,
     ILoad1 = 0x1b,
@@ -23,6 +26,8 @@ pub const OpcodeEnum = enum(u8) {
     IMul = 0x68,
     IDiv = 0x6c,
     IRem = 0x70,
+    IfCmpLe = 0xa4,
+    GoTo = 0xa7,
     IReturn = 0xac,
     InvokeStatic = 0xb8,
     Return = 0xb1,
@@ -37,8 +42,11 @@ pub const OpcodeEnum = enum(u8) {
     pub fn getOperandLength(self: OpcodeEnum) usize {
         return switch (self) {
             OpcodeEnum.BiPush => 2, // 1 byte operand
+            OpcodeEnum.SiPush => 3, // 2 byte operand
             OpcodeEnum.IStore => 2, // istore <index>
             OpcodeEnum.ILoad => 2, // iload <index>
+            OpcodeEnum.IfCmpLe => 3, // if_icmple <branchbyte1> <branchbyte2>
+            OpcodeEnum.GoTo => 3, // goto <branchbyte1> <branchbyte2>
             OpcodeEnum.InvokeStatic => 3, // invokestatic <indexbyte1> <indexbyte2>
             else => 1, // nessun operand
         };
@@ -46,6 +54,8 @@ pub const OpcodeEnum = enum(u8) {
 
     pub fn toString(self: OpcodeEnum) []const u8 {
         return switch (self) {
+            OpcodeEnum.Nop => "nop",
+            OpcodeEnum.DConst0 => "dconst_0",
             OpcodeEnum.IConstM1 => "iconst_m1",
             OpcodeEnum.IConst0 => "iconst_0",
             OpcodeEnum.IConst1 => "iconst_1",
@@ -54,6 +64,7 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.IConst4 => "iconst_4",
             OpcodeEnum.IConst5 => "iconst_5",
             OpcodeEnum.BiPush => "bipush",
+            OpcodeEnum.SiPush => "sipush",
             OpcodeEnum.ILoad => "iload",
             OpcodeEnum.ILoad0 => "iload_0",
             OpcodeEnum.ILoad1 => "iload_1",
@@ -70,7 +81,9 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.IMul => "imul",
             OpcodeEnum.IDiv => "idiv",
             OpcodeEnum.IRem => "irem",
+            OpcodeEnum.IfCmpLe => "if_icmple",
             OpcodeEnum.InvokeStatic => "invokestatic",
+            OpcodeEnum.GoTo => "goto",
             OpcodeEnum.IReturn => "ireturn",
             OpcodeEnum.Return => "return",
         };

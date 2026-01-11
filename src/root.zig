@@ -86,6 +86,21 @@ test "ZJVM Test Suite 3" {
     try makeTestSuite(filePath, &expectedValues);
 }
 
+test "ZJVM Test Suite 4" {
+    const expectedValues = [_]v.Value{
+        .{ .Int = 0 },
+        .{ .Int = 3200 },
+        .{ .Int = 8 },
+        .{ .Int = 25600 },
+        .{ .Int = 2000 },
+        .{ .Int = 4 },
+        .{ .Int = 500 },
+        .{ .Int = 24100 },
+    };
+    const filePath = "samples/TestSuite4.class";
+    try makeTestSuite(filePath, &expectedValues);
+}
+
 // Import all test files to include them in the test suite
 test {
     _ = @import("runtime/value_test.zig");
