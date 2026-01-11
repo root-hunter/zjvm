@@ -8,6 +8,7 @@ test "ZJVM Test Suite 1" {
     const fr = @import("runtime/frame.zig");
     const i = @import("engine/interpreter.zig");
     const v = @import("runtime/value.zig");
+    const ZJVM = @import("engine/vm.zig").ZJVM;
 
     const testing = std.testing;
 
@@ -27,11 +28,13 @@ test "ZJVM Test Suite 1" {
     try classInfo.parse(&cursor);
 
     const mMain = try classInfo.getMethod("main");
+    var vm = try ZJVM.init(&allocator, 1024);
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
             var frame = try fr.Frame.init(&allocator, codeAttr);
-            try i.JVMInterpreter.execute(&frame);
+            try vm.pushFrame(frame);
+            try i.JVMInterpreter.execute(&vm);
 
             const expectedValues = [_]v.Value{
                 .{ .Int = 0 },
