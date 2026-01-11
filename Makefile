@@ -1,3 +1,5 @@
+RELEASE_MODE ?= safe
+
 build-samples:
 	@echo "Building sample Java class files..."
 	javac samples/*.java
@@ -7,6 +9,11 @@ build-zjvm:
 	@echo "Building ZJVM..."
 	zig build
 	@echo "ZJVM build complete."
+
+build-zjvm-release:
+	@echo "Building ZJVM in release mode..."
+	zig build --release=$(RELEASE_MODE)
+	@echo "ZJVM release build complete."
 
 test:
 	@echo "Running ZJVM tests..."
@@ -20,6 +27,11 @@ clean-zjvm:
 
 run: build-zjvm
 	@echo "Running ZJVM..."
+	./zig-out/bin/zjvm $(ARGS)
+	@echo "Finished"
+
+run-release: build-zjvm-release
+	@echo "Running ZJVM in release mode..."
 	./zig-out/bin/zjvm $(ARGS)
 	@echo "Finished"
 
