@@ -9,6 +9,7 @@ pub const JVMInterpreter = struct {
             const result = std.meta.intToEnum(OpcodeEnum, frame.code[frame.pc]);
 
             if (result == error.InvalidEnumTag) {
+                std.debug.print("Invalid opcode 0x{x} at pc {d}\n", .{ frame.code[frame.pc], frame.pc });
                 return error.InvalidOpcode;
             }
 
@@ -43,13 +44,19 @@ pub const JVMInterpreter = struct {
                     try frame.operand_stack.push(Value{ .Int = 5 });
                     frame.pc += opcode.getOperandLength();
                 },
-                OpcodeEnum.BiPush => { // bipush
-                    const byte = frame.code[frame.pc];
-                    try frame.operand_stack.push(Value{ .Int = @intCast(byte) });
+                OpcodeEnum.BiPush => {
+                    const byte = frame.code[frame.pc + 1]; // il byte seguente
+                    const value: i32 = @intCast(byte); // bipush è signed 8-bit
+                    try frame.operand_stack.push(Value{ .Int = value });
                     frame.pc += opcode.getOperandLength();
                 },
                 OpcodeEnum.ILoad1 => { // iload_1
                     const value = frame.local_vars.vars[1];
+                    try frame.operand_stack.push(value);
+                    frame.pc += opcode.getOperandLength();
+                },
+                OpcodeEnum.ILoad2 => { // iload_2
+                    const value = frame.local_vars.vars[2];
                     try frame.operand_stack.push(value);
                     frame.pc += opcode.getOperandLength();
                 },
@@ -113,13 +120,16 @@ pub const JVMInterpreter = struct {
                     try frame.operand_stack.push(Value{ .Int = a + b });
                     frame.pc += opcode.getOperandLength();
                 },
-                OpcodeEnum.IReturn => { // ireturn
+                OpcodeEnum.IReturn => {
+                    _ = try frame.operand_stack.pop(); // consumi il valore da restituire
                     return;
                 },
                 OpcodeEnum.Return => { // return
                     return;
                 },
             }
+
+            frame.dump();
         }
     }
 };

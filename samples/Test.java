@@ -6,6 +6,6 @@ public class Test {
 
         var l = 50 + s;
 
-        var s2 = 20 + l;
+        var s2 = 20 + l + g;
     }
 }

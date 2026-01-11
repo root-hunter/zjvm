@@ -4,11 +4,13 @@ const Value = @import("value.zig").Value;
 pub const OperandStack = struct {
     data: []Value,
     top: usize,
+    size: usize,
 
     pub fn init(allocator: *const std.mem.Allocator, max: usize) !OperandStack {
         return OperandStack{
             .data = try allocator.alloc(Value, max),
             .top = 0,
+            .size = max,
         };
     }
 

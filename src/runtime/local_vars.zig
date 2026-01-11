@@ -5,8 +5,13 @@ pub const LocalVars = struct {
     vars: []Value,
 
     pub fn init(allocator: *const std.mem.Allocator, count: usize) !LocalVars {
+        const vars = try allocator.alloc(Value, count);
+        // Inizializza tutte le variabili a Int: 0
+        for (vars) |*v| {
+            v.* = Value{ .Int = 0 };
+        }
         return LocalVars{
-            .vars = try allocator.alloc(Value, count),
+            .vars = vars,
         };
     }
 
