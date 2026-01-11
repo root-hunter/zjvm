@@ -73,9 +73,35 @@ jobs:
       with:
         version: 0.15.2
     
+    - name: Setup Zig
+      uses: goto-bus-stop/setup-zig@v2
+      with:
+        version: 0.15.2
+
+    - name: Install Java (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openjdk-11-jdk
+
+    - name: Install Java (macOS)
+      if: matrix.os == 'macos-latest'
+      run: brew install openjdk@11
+    
+    - name: Install Java (Windows)
+      if: matrix.os == 'windows-latest'
+      run: choco install openjdk11 -y
+
+    - name: Verify Java installation
+      run: java -version
+
+    - name: Build Java samples
+      run: |
+        javac samples/*.java
+            
     - name: Run tests
       run: zig build test
-    
+
     - name: Build ZJVM
       run: zig build -Doptimize=ReleaseSafe
     
