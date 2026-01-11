@@ -32,10 +32,7 @@ pub fn main() !void {
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
-            codeAttr.dump();
-
             std.debug.print("Starting execution of 'main'...\n", .{});
-            try codeAttr.dumpOpcodes();
 
             var frame = try fr.Frame.init(&allocator, codeAttr);
             try JVMInterpreter.execute(&frame);

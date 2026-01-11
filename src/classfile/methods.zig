@@ -90,14 +90,6 @@ pub const MethodInfo = struct {
         }
     }
 
-    pub fn dumpCode(self: *const MethodInfo) !void {
-        if (self.code) |code| {
-            code.dump();
-        } else {
-            std.debug.print("  No code attribute\n", .{});
-        }
-    }
-
     pub fn deinit(self: *MethodInfo) void {
         if (self.attributes) |attributes| {
             self.allocator.free(attributes);

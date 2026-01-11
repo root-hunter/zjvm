@@ -30,8 +30,9 @@ pub const OpcodeEnum = enum(u8) {
 
     pub fn getOperandLength(self: OpcodeEnum) usize {
         return switch (self) {
-            OpcodeEnum.BiPush => 2,
-            else => 1,
+            OpcodeEnum.BiPush => 2, // 1 byte operand
+            OpcodeEnum.IStore => 2, // istore <index>
+            else => 1, // nessun operand
         };
     }
 

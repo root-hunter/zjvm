@@ -7,5 +7,8 @@ public class Test {
         var l = 50 + s;
 
         var s2 = 20 + l + g;
+
+        var s3 = 20 + l + g + g + g;
+
     }
 }
