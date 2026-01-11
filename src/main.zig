@@ -35,6 +35,7 @@ pub fn main() !void {
 
             var frame = try fr.Frame.init(&allocator, codeAttr);
             try JVMInterpreter.execute(&frame);
+            frame.dump();
 
             std.debug.print("Execution of 'main' completed.\n", .{});
         } else {

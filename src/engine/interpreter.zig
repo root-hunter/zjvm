@@ -112,7 +112,6 @@ pub const JVMInterpreter = struct {
                     return;
                 },
                 OpcodeEnum.Return => { // return
-                    frame.dump();
                     return;
                 },
             }
