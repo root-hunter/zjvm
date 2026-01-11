@@ -112,10 +112,10 @@ pub const JVMInterpreter = struct {
                     return;
                 },
                 OpcodeEnum.Return => { // return
+                    frame.dump();
                     return;
                 },
             }
-            frame.dump();
 
             frame.pc += opcode.getOperandLength();
         }

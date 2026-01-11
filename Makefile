@@ -19,5 +19,5 @@ run: build-zjvm
 
 build-sample:
 	@echo "Building sample Java class file..."
-	javac samples/Test.java
+	javac samples/TestSuite1.java
 	@echo "Sample Java class file build complete."

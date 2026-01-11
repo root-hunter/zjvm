@@ -1,25 +1,61 @@
 //! By convention, root.zig is the root source file when making a library.
-const std = @import("std");
 
-pub fn bufferedPrint() !void {
-    // Stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-    const stdout = &stdout_writer.interface;
+test "ZJVM Test Suite 1" {
+    const std = @import("std");
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    const utils = @import("classfile/utils.zig");
+    const parser = @import("classfile/parser.zig");
+    const fr = @import("runtime/frame.zig");
+    const i = @import("engine/interpreter.zig");
+    const v = @import("runtime/value.zig");
 
-    try stdout.flush(); // Don't forget to flush!
-}
+    const testing = std.testing;
 
-pub fn add(a: i32, b: i32) i32 {
-    return a + b;
-}
+    // This test exists to ensure that the test suite runs all tests in the project.
+    // Individual test files are imported below.
 
-test "basic add functionality" {
-    try std.testing.expect(add(3, 7) == 10);
+    const allocator = std.heap.page_allocator;
+    // You can add any global setup code for tests here if needed.
+    var file = try std.fs.cwd().openFile("samples/TestSuite1.class", .{ .mode = .read_only });
+    defer file.close();
+
+    const file_size = try file.getEndPos();
+    const data = try file.readToEndAlloc(allocator, file_size);
+    defer allocator.free(data);
+
+    // Global teardown code can go here if needed.
+
+    var cursor = utils.Cursor.init(data);
+    var classInfo = parser.ClassInfo.init(&allocator);
+    defer classInfo.deinit();
+
+    try classInfo.parse(&cursor);
+
+    const mMain = try classInfo.getMethod("main");
+
+    if (mMain) |method| {
+        if (method.code) |codeAttr| {
+            var frame = try fr.Frame.init(&allocator, codeAttr);
+            try i.JVMInterpreter.execute(&frame);
+
+            const expectedValues = [_]v.Value{
+                .{ .Int = 0 },
+                .{ .Int = 33 },
+                .{ .Int = 100 },
+                .{ .Int = 83 },
+                .{ .Int = 203 },
+                .{ .Int = 403 },
+                .{ .Int = 799 },
+            };
+
+            var index: usize = 0;
+            while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
+                try testing.expectEqual(expectedValues[index], frame.local_vars.get(index));
+            }
+        } else {
+            // try testing.expect(false, "No code attribute found for method 'main'");
+        }
+    }
 }
 
 // Import all test files to include them in the test suite

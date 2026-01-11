@@ -1,4 +1,4 @@
-public class Test {
+public class TestSuite1 {
     public static void main(String[] args) {
         var s = 32 + 1;
 

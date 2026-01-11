@@ -1,8 +1,7 @@
 const std = @import("std");
 const OperandStack = @import("operand_stack.zig").OperandStack;
 const LocalVars = @import("local_vars.zig").LocalVars;
-const Value = @import("value.zig").Value;
-const ValueTag = @import("value.zig").ValueTag;
+const v = @import("value.zig");
 const ca = @import("../classfile/code.zig");
 
 pub const Frame = struct {
@@ -32,15 +31,15 @@ pub const Frame = struct {
         std.debug.print("Code Length: {d}\n", .{self.code.len});
         std.debug.print("\nLocal Variables ({d}):\n", .{self.local_vars.vars.len});
 
-        for (self.local_vars.vars, 0..) |v, i| {
+        for (self.local_vars.vars, 0..) |val, i| {
             std.debug.print("  [{}] = ", .{i});
-            switch (v) {
-                ValueTag.Int => std.debug.print("{d} (Int)\n", .{v.Int}),
-                ValueTag.Float => std.debug.print("{d} (Float)\n", .{v.Float}),
-                ValueTag.Long => std.debug.print("{d} (Long)\n", .{v.Long}),
-                ValueTag.Double => std.debug.print("{d} (Double)\n", .{v.Double}),
-                ValueTag.Reference => std.debug.print("0x{x} (Reference)\n", .{v.Reference}),
-                ValueTag.ArrayRef => std.debug.print("{any} (ArrayRef)\n", .{v.ArrayRef}),
+            switch (val) {
+                v.ValueTag.Int => std.debug.print("{d} (Int)\n", .{val.Int}),
+                v.ValueTag.Float => std.debug.print("{d} (Float)\n", .{val.Float}),
+                v.ValueTag.Long => std.debug.print("{d} (Long)\n", .{val.Long}),
+                v.ValueTag.Double => std.debug.print("{d} (Double)\n", .{val.Double}),
+                v.ValueTag.Reference => std.debug.print("0x{x} (Reference)\n", .{val.Reference}),
+                v.ValueTag.ArrayRef => std.debug.print("{any} (ArrayRef)\n", .{val.ArrayRef}),
             }
         }
 
