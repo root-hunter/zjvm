@@ -124,6 +124,10 @@ pub const JVMInterpreter = struct {
                     const value = try frame.operand_stack.pop();
                     frame.local_vars.vars[index] = value;
                 },
+                OpcodeEnum.IStore0 => { // istore_0
+                    const value = try frame.operand_stack.pop();
+                    frame.local_vars.vars[0] = value;
+                },
                 OpcodeEnum.IStore1 => { // istore_1
                     const value = try frame.operand_stack.pop();
                     frame.local_vars.vars[1] = value;
