@@ -5,7 +5,7 @@ pub const JVMStack = struct {
     frames: []Frame,
     top: usize,
 
-    pub fn init(allocator: *std.mem.Allocator, max: usize) !JVMStack {
+    pub fn init(allocator: *const std.mem.Allocator, max: usize) !JVMStack {
         return JVMStack{
             .frames = try allocator.alloc(Frame, max),
             .top = 0,

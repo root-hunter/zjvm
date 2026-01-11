@@ -6,6 +6,7 @@ const utils = @import("classfile/utils.zig");
 const fr = @import("runtime/frame.zig");
 
 const JVMInterpreter = @import("engine/interpreter.zig").JVMInterpreter;
+const ZJVM = @import("engine/vm.zig").ZJVM;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -29,12 +30,15 @@ pub fn main() !void {
 
     try classInfo.dump();
 
+    var vm = try ZJVM.init(&allocator, 1024);
+
     if (mMain) |method| {
         if (method.code) |codeAttr| {
             std.debug.print("Starting execution of 'main'...\n", .{});
 
             var frame = try fr.Frame.init(&allocator, codeAttr);
-            try JVMInterpreter.execute(&frame);
+            try vm.pushFrame(frame);
+            try JVMInterpreter.execute(&vm);
             frame.dump();
 
             std.debug.print("Execution of 'main' completed.\n", .{});

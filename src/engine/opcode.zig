@@ -20,6 +20,7 @@ pub const OpcodeEnum = enum(u8) {
     ISub = 0x64,
     IAdd = 0x60,
     IReturn = 0xac,
+    InvokeStatic = 0xb8,
     Return = 0xb1,
 
     pub fn getOperandFormat(self: OpcodeEnum) OperandFormat {
@@ -34,6 +35,7 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.BiPush => 2, // 1 byte operand
             OpcodeEnum.IStore => 2, // istore <index>
             OpcodeEnum.ILoad => 2, // iload <index>
+            OpcodeEnum.InvokeStatic => 3, // invokestatic <indexbyte1> <indexbyte2>
             else => 1, // nessun operand
         };
     }
@@ -60,6 +62,7 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.IStore2 => "istore_2",
             OpcodeEnum.IStore3 => "istore_3",
             OpcodeEnum.IAdd => "iadd",
+            OpcodeEnum.InvokeStatic => "invokestatic",
             OpcodeEnum.IReturn => "ireturn",
             OpcodeEnum.Return => "return",
         };

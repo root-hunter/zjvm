@@ -2,10 +2,19 @@ const std = @import("std");
 const Frame = @import("../runtime/frame.zig").Frame;
 const Value = @import("../runtime/value.zig").Value;
 const OpcodeEnum = @import("opcode.zig").OpcodeEnum;
+const ZJVM = @import("../engine/vm.zig").ZJVM;
 
 pub const JVMInterpreter = struct {
-    pub fn execute(frame: *Frame) !void {
-        while (frame.pc < frame.code.len) {
+    pub fn execute(vm: *ZJVM) !void {
+        while (true) {
+            const frame = vm.currentFrame() orelse return error.NoFrame;
+
+            if (frame.pc >= frame.code.len) {
+                _ = try vm.popFrame();
+                if (vm.stack.top == 0) break;
+                continue;
+            }
+
             const result = std.meta.intToEnum(OpcodeEnum, frame.code[frame.pc]);
 
             if (result == error.InvalidEnumTag) {
@@ -106,6 +115,9 @@ pub const JVMInterpreter = struct {
                     const b = (try frame.operand_stack.pop()).Int;
                     const a = (try frame.operand_stack.pop()).Int;
                     try frame.operand_stack.push(Value{ .Int = a + b });
+                },
+                OpcodeEnum.InvokeStatic => {
+                    return error.UnsupportedOperation;
                 },
                 OpcodeEnum.IReturn => {
                     _ = try frame.operand_stack.pop();
