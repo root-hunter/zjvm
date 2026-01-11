@@ -39,7 +39,11 @@ jobs:
 
             - name: Verify Java installation
               run: java -version
-
+            
+            - name: Build Java samples
+              run: |
+                  javac samples/*.java
+                  
             - name: Run tests
               run: zig build test
 
