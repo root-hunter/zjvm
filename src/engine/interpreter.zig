@@ -125,6 +125,14 @@ pub const JVMInterpreter = struct {
                     const a = (try frame.operand_stack.pop()).Int;
                     try frame.operand_stack.push(Value{ .Int = a * b });
                 },
+                OpcodeEnum.IDiv => { // idiv
+                    const b = (try frame.operand_stack.pop()).Int;
+                    const a = (try frame.operand_stack.pop()).Int;
+                    if (b == 0) {
+                        return error.ArithmeticException;
+                    }
+                    try frame.operand_stack.push(Value{ .Int = @divFloor(a, b) });
+                },
                 OpcodeEnum.InvokeStatic => {
                     const index_high = frame.code[frame.pc + 1];
                     const index_low = frame.code[frame.pc + 2];

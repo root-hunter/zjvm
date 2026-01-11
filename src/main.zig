@@ -11,7 +11,7 @@ const ZJVM = @import("engine/vm.zig").ZJVM;
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
-    var file = try std.fs.cwd().openFile("samples/TestSuite2.class", .{ .mode = .read_only });
+    var file = try std.fs.cwd().openFile("samples/TestSuite3.class", .{ .mode = .read_only });
     defer file.close();
 
     const file_size = try file.getEndPos();

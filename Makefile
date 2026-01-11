@@ -2,6 +2,7 @@ build-sample:
 	@echo "Building sample Java class file..."
 	javac samples/TestSuite1.java
 	javac samples/TestSuite2.java
+	javac samples/TestSuite3.java
 	@echo "Sample Java class file build complete."
 
 build-zjvm:
