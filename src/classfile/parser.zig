@@ -35,6 +35,10 @@ pub const ClassInfo = struct {
     attributes_count: types.U2,
     attributes: ?[]AttributesInfo,
 
+    // ZJVM additions
+    name: []const u8,
+    super_class_name: []const u8,
+
     pub fn init(allocator: *const std.mem.Allocator) ClassInfo {
         return ClassInfo{
             .allocator = allocator,
@@ -55,6 +59,8 @@ pub const ClassInfo = struct {
             .methods = null,
             .attributes_count = 0,
             .attributes = null,
+            .name = &[_]u8{},
+            .super_class_name = &[_]u8{},
         };
     }
 
@@ -103,6 +109,10 @@ pub const ClassInfo = struct {
     pub fn parseClassMetadata(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.this_class = try cursor.readU2();
         self.super_class = try cursor.readU2();
+
+        // ZJVM additions
+        self.name = try self.setClassName();
+        self.super_class_name = try self.setSuperClassName();
     }
 
     pub fn parseInferfaces(self: *ClassInfo, cursor: *utils.Cursor) !void {
@@ -118,7 +128,7 @@ pub const ClassInfo = struct {
 
     pub fn parseFields(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.fields_count = try cursor.readU2();
-        self.fields = try FieldInfo.parseAll(cursor, @intCast(self.fields_count), self.allocator);
+        self.fields = try FieldInfo.parseAll(cursor, @intCast(self.fields_count), self.allocator, self);
     }
 
     pub fn parseMethods(self: *ClassInfo, cursor: *utils.Cursor) !void {
@@ -128,7 +138,7 @@ pub const ClassInfo = struct {
 
     pub fn parseAttributes(self: *ClassInfo, cursor: *utils.Cursor) !void {
         self.attributes_count = try cursor.readU2();
-        self.attributes = try AttributesInfo.parseAll(cursor, @intCast(self.attributes_count), self.allocator);
+        self.attributes = try AttributesInfo.parseAll(self.allocator, cursor, @intCast(self.attributes_count), self);
     }
 
     pub fn isValidMagicNumber(self: *ClassInfo) bool {
@@ -157,7 +167,7 @@ pub const ClassInfo = struct {
         return self.getConstant(name_index);
     }
 
-    pub fn getClassName(self: *ClassInfo) ![]const u8 {
+    fn setClassName(self: *ClassInfo) ![]const u8 {
         const class_cp = self.constant_pool.?[@intCast(self.this_class - 1)];
         return switch (class_cp) {
             .Class => |name_index| self.getConstant(name_index),
@@ -165,7 +175,7 @@ pub const ClassInfo = struct {
         };
     }
 
-    pub fn getSuperClassName(self: *ClassInfo) ![]const u8 {
+    fn setSuperClassName(self: *ClassInfo) ![]const u8 {
         const super_cp = self.constant_pool.?[@intCast(self.super_class - 1)];
         return switch (super_cp) {
             .Class => |name_index| self.getConstant(name_index),
@@ -173,9 +183,21 @@ pub const ClassInfo = struct {
         };
     }
 
+    pub fn getClassName(self: *ClassInfo) []const u8 {
+        return self.name;
+    }
+
+    pub fn getSuperClassName(self: *ClassInfo) []const u8 {
+        return self.super_class_name;
+    }
+
     pub fn dump(self: *ClassInfo) !void {
-        std.debug.print("Class: {s}\n", .{try self.getClassName()});
-        std.debug.print("Super: {s}\n", .{try self.getSuperClassName()});
+        std.debug.print("Class: {s}\n", .{self.name});
+        std.debug.print("Super: {s}\n", .{self.super_class_name});
+        std.debug.print("Magic: 0x{X:0>8}\n", .{self.magic});
+        std.debug.print("Version: {d}.{d}\n", .{ self.major_version, self.minor_version });
+        std.debug.print("Constant Pool Count: {d}\n", .{self.constant_pool_count});
+        std.debug.print("Access Flags: 0x{X:0>4}\n", .{self.access_flags});
         std.debug.print("Fields:\n", .{});
 
         if (self.fields) |fields| {
@@ -190,6 +212,18 @@ pub const ClassInfo = struct {
                 try tmethod.dump();
             }
         }
+    }
+
+    pub fn getMethod(self: *ClassInfo, name: []const u8) !?MethodInfo {
+        if (self.methods) |methods| {
+            for (methods) |method| {
+                const method_name = try self.getConstant(method.name_index);
+                if (std.mem.eql(u8, method_name, name)) {
+                    return method;
+                }
+            }
+        }
+        return null;
     }
 
     pub fn deinit(self: *ClassInfo) void {

@@ -2,6 +2,7 @@ const std = @import("std");
 const types = @import("types.zig");
 const utils = @import("utils.zig");
 const a = @import("attributes.zig");
+const p = @import("parser.zig");
 
 pub const FieldInfo = struct {
     allocator: *const std.mem.Allocator,
@@ -12,7 +13,11 @@ pub const FieldInfo = struct {
     attributes_count: types.U2,
     attributes: ?[]a.AttributesInfo,
 
-    pub fn parse(allocator: *const std.mem.Allocator, cursor: *utils.Cursor) !FieldInfo {
+    // ZJVM additions
+    name: []const u8,
+    descriptor: []const u8,
+
+    pub fn parse(allocator: *const std.mem.Allocator, cursor: *utils.Cursor, class: *const p.ClassInfo) !FieldInfo {
         var self = FieldInfo{
             .allocator = allocator,
             .access_flags = 0,
@@ -20,6 +25,8 @@ pub const FieldInfo = struct {
             .descriptor_index = 0,
             .attributes_count = 0,
             .attributes = null,
+            .name = &[_]u8{},
+            .descriptor = &[_]u8{},
         };
 
         self.access_flags = try cursor.readU2();
@@ -27,18 +34,21 @@ pub const FieldInfo = struct {
         self.descriptor_index = try cursor.readU2();
         self.attributes_count = try cursor.readU2();
 
+        self.name = try class.getConstant(self.name_index);
+        self.descriptor = try class.getConstant(self.descriptor_index);
+
         const count: usize = @intCast(self.attributes_count);
-        self.attributes = try a.AttributesInfo.parseAll(cursor, count, self.allocator);
+        self.attributes = try a.AttributesInfo.parseAll(self.allocator, cursor, count, class);
 
         return self;
     }
 
-    pub fn parseAll(cursor: *utils.Cursor, count: usize, allocator: *const std.mem.Allocator) ![]FieldInfo {
+    pub fn parseAll(cursor: *utils.Cursor, count: usize, allocator: *const std.mem.Allocator, class: *const p.ClassInfo) ![]FieldInfo {
         var fields = try allocator.alloc(FieldInfo, count);
 
         var i: usize = 0;
         while (i < count) : (i += 1) {
-            const field = try FieldInfo.parse(allocator, cursor);
+            const field = try FieldInfo.parse(allocator, cursor, class);
             fields[i] = field;
         }
 

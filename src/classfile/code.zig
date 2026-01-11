@@ -22,6 +22,7 @@ pub const CodeAttribute = struct {
     pub fn parse(
         allocator: *const std.mem.Allocator,
         cursor: *Cursor,
+        class: *const p.ClassInfo,
     ) !CodeAttribute {
         const max_stack = try cursor.readU2();
         const max_locals = try cursor.readU2();
@@ -46,9 +47,10 @@ pub const CodeAttribute = struct {
 
         const attributes_count = try cursor.readU2();
         const attrs = try AttributesInfo.parseAll(
+            allocator,
             cursor,
             @intCast(attributes_count),
-            allocator,
+            class,
         );
 
         return CodeAttribute{
@@ -65,11 +67,9 @@ pub const CodeAttribute = struct {
         class: *const p.ClassInfo,
         allocator: *const std.mem.Allocator,
     ) !?CodeAttribute {
-        const name = try class.getConstant(attr.attribute_name_index);
-
-        if (std.mem.eql(u8, name, "Code")) {
+        if (std.mem.eql(u8, attr.name, "Code")) {
             var cursor = Cursor.init(attr.info);
-            return try CodeAttribute.parse(allocator, &cursor);
+            return try CodeAttribute.parse(allocator, &cursor, class);
         }
 
         return null;
@@ -78,10 +78,11 @@ pub const CodeAttribute = struct {
     pub fn dump(self: *const CodeAttribute) void {
         const code_len: usize = @intCast(self.code.len);
 
-        std.debug.print("    Max Stack: {}\n", .{self.max_stack});
-        std.debug.print("    Max Locals: {}\n", .{self.max_locals});
-        std.debug.print("    Code Length: {}\n", .{code_len});
-        std.debug.print("    Exception Table Length: {}\n", .{self.exception_table.len});
-        std.debug.print("    Attributes Count: {}\n", .{self.attributes.len});
+        std.debug.print("    Code Attribute:\n", .{});
+        std.debug.print("      Max Stack: {}\n", .{self.max_stack});
+        std.debug.print("      Max Locals: {}\n", .{self.max_locals});
+        std.debug.print("      Code Length: {}\n", .{code_len});
+        std.debug.print("      Exception Table Length: {}\n", .{self.exception_table.len});
+        std.debug.print("      Attributes Count: {}\n", .{self.attributes.len});
     }
 };

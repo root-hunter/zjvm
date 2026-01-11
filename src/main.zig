@@ -20,6 +20,10 @@ pub fn main() !void {
 
     try classInfo.parse(&cursor);
 
+    const mMain = try classInfo.getMethod("main");
+
+    std.debug.print("Method 'main' found: {any}\n", .{mMain});
+
     try classInfo.dump();
 
     try zjvm.bufferedPrint();

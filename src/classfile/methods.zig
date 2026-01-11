@@ -8,8 +8,6 @@ const p = @import("parser.zig");
 pub const MethodInfo = struct {
     allocator: *const std.mem.Allocator,
 
-    class: *const p.ClassInfo,
-
     access_flags: types.U2,
     name_index: types.U2,
     descriptor_index: types.U2,
@@ -18,6 +16,10 @@ pub const MethodInfo = struct {
 
     code: ?ca.CodeAttribute,
 
+    // ZJVM additions
+    name: []const u8,
+    descriptor: []const u8,
+
     pub fn parse(allocator: *const std.mem.Allocator, class: *const p.ClassInfo, cursor: *utils.Cursor) !MethodInfo {
         var self = MethodInfo{
             .allocator = allocator,
@@ -25,9 +27,10 @@ pub const MethodInfo = struct {
             .name_index = 0,
             .descriptor_index = 0,
             .attributes_count = 0,
-            .class = class,
             .attributes = null,
             .code = null,
+            .name = &[_]u8{},
+            .descriptor = &[_]u8{},
         };
 
         self.access_flags = try cursor.readU2();
@@ -35,10 +38,13 @@ pub const MethodInfo = struct {
         self.descriptor_index = try cursor.readU2();
         self.attributes_count = try cursor.readU2();
 
-        const count: usize = @intCast(self.attributes_count);
-        self.attributes = try a.AttributesInfo.parseAll(cursor, count, self.allocator);
+        self.name = try class.getConstant(self.name_index);
+        self.descriptor = try class.getConstant(self.descriptor_index);
 
-        self.code = try self.parseCodeAttribute(self.class);
+        const count: usize = @intCast(self.attributes_count);
+        self.attributes = try a.AttributesInfo.parseAll(self.allocator, cursor, count, class);
+
+        self.code = try self.parseCodeAttribute(class);
 
         return self;
     }
@@ -71,10 +77,11 @@ pub const MethodInfo = struct {
     }
 
     pub fn dump(self: *const MethodInfo) !void {
-        const name = try self.class.getConstant(self.name_index);
-        const descriptor = try self.class.getConstant(self.descriptor_index);
-
-        std.debug.print("Method: {s} {s}\n", .{name, descriptor});
+        std.debug.print("  Method: {s}\n", .{self.name});
+        std.debug.print("    Descriptor: {s}\n", .{self.descriptor});
+        std.debug.print("    Descriptor Index: {}\n", .{self.descriptor_index});
+        std.debug.print("    Name Index: {}\n", .{self.name_index});
+        std.debug.print("    Access Flags: 0x{X:0>4}\n", .{self.access_flags});
 
         if (self.code) |code| {
             code.dump();
