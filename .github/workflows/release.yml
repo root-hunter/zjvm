@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    
+    steps:
+    - name: Get version from tag
+      id: get_version
+      run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ steps.get_version.outputs.version }}
+        draft: false
+        prerelease: false
+        body: |
+          ## ZJVM Release ${{ steps.get_version.outputs.version }}
+          
+          ### Downloads
+          - **Linux**: zjvm-linux-x86_64
+          - **macOS**: zjvm-macos-x86_64
+          - **Windows**: zjvm-windows-x86_64.exe
+          
+          ### Installation
+          1. Download the appropriate binary for your platform
+          2. Make it executable (Linux/macOS): `chmod +x zjvm-*`
+          3. Run: `./zjvm-*` (or `zjvm-windows-x86_64.exe` on Windows)
+          
+          ### What's Changed
+          See the [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
+
+  build-and-upload:
+    name: Build on ${{ matrix.os }}
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-linux
+            artifact_name: zjvm
+            asset_name: zjvm-linux-x86_64
+          - os: macos-latest
+            target: x86_64-macos
+            artifact_name: zjvm
+            asset_name: zjvm-macos-x86_64
+          - os: windows-latest
+            target: x86_64-windows
+            artifact_name: zjvm.exe
+            asset_name: zjvm-windows-x86_64.exe
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Zig
+      uses: goto-bus-stop/setup-zig@v2
+      with:
+        version: 0.15.2
+    
+    - name: Run tests
+      run: zig build test
+    
+    - name: Build ZJVM
+      run: zig build -Doptimize=ReleaseSafe
+    
+    - name: Prepare artifact (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        cp zig-out/bin/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+        chmod +x ${{ matrix.asset_name }}
+    
+    - name: Prepare artifact (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        copy zig-out\bin\${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+    
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./${{ matrix.asset_name }}
+        asset_name: ${{ matrix.asset_name }}
+        asset_content_type: application/octet-stream
