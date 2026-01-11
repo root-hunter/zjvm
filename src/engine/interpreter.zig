@@ -28,6 +28,9 @@ pub const JVMInterpreter = struct {
                 OpcodeEnum.Nop => {
                     // Do nothing
                 },
+                OpcodeEnum.FConts2 => { // fconst_2
+                    try frame.operand_stack.push(Value{ .Float = 2.0 });
+                },
                 OpcodeEnum.DConst0 => { // dconst_0
                     try frame.operand_stack.push(Value{ .Double = 0.0 });
                 },
@@ -159,6 +162,35 @@ pub const JVMInterpreter = struct {
                     }
                     try frame.operand_stack.push(Value{ .Int = @rem(a, b) });
                 },
+                OpcodeEnum.IInc => { // iinc
+                    const index_byte = frame.code[frame.pc + 1];
+                    const const_byte = frame.code[frame.pc + 2];
+
+                    const index: usize = @intCast(index_byte);
+                    const increment: i32 = @intCast(const_byte);
+
+                    var current_value = frame.local_vars.vars[index].Int;
+                    current_value += increment;
+                    frame.local_vars.vars[index] = Value{ .Int = current_value };
+                },
+                OpcodeEnum.IfCmpGe => { // if_icmpge
+                    const value2 = try frame.operand_stack.pop();
+                    const value1 = try frame.operand_stack.pop();
+
+                    const offset_high = frame.code[frame.pc + 1];
+                    const offset_low = frame.code[frame.pc + 2];
+
+                    const high: i16 = @intCast(offset_high);
+                    const low: i16 = @intCast(offset_low);
+
+                    const branch_offset: i16 = (high << 8) | low;
+
+                    if (value1.Int >= value2.Int) {
+                        const b: i32 = @intCast(frame.pc);
+                        frame.pc = @intCast(b + branch_offset);
+                        continue;
+                    }
+                },
                 OpcodeEnum.IfCmpLe => { // if_icmple
                     const value2 = try frame.operand_stack.pop();
                     const value1 = try frame.operand_stack.pop();
@@ -172,48 +204,45 @@ pub const JVMInterpreter = struct {
                     const branch_offset: i16 = (high << 8) | low;
 
                     if (value1.Int <= value2.Int) {
-                        const offset: usize = @intCast(branch_offset);
-                        frame.pc += offset - 3;
+                        const b: i32 = @intCast(frame.pc);
+                        frame.pc = @intCast(b + branch_offset);
+                        continue;
                     }
                 },
                 OpcodeEnum.InvokeStatic => {
                     const index_high = frame.code[frame.pc + 1];
                     const index_low = frame.code[frame.pc + 2];
 
-                    const high: u16 = @intCast(index_high);
-                    const low: u16 = @intCast(index_low);
-
-                    const method_index: u16 = (high << 8) | low;
+                    const method_index: u16 =
+                        (@as(u16, index_high) << 8) | @as(u16, index_low);
 
                     const method_name = try frame.class.getConstant(method_index);
-                    const method = try frame.class.getMethod(method_name);
+                    const method = try frame.class.getMethod(method_name) orelse return error.MethodNotFound;
 
-                    if (method == null) {
-                        return error.MethodNotFound;
-                    }
+                    const codeAttr = method.code orelse return error.NoCodeAttribute;
 
-                    const codeAttr = method.?.code orelse return error.NoCodeAttribute;
+                    frame.pc += opcode.getOperandLength();
 
                     var new_frame = try Frame.init(allocator, codeAttr, frame.class);
 
-                    for (0..method.?.num_params) |i| {
+                    for (0..method.num_params) |i| {
                         const arg = try frame.operand_stack.pop();
-                        new_frame.local_vars.vars[method.?.num_params - 1 - i] = arg;
+                        new_frame.local_vars.vars[method.num_params - 1 - i] = arg;
                     }
 
                     try vm.pushFrame(new_frame);
+                    continue;
                 },
-                OpcodeEnum.GoTo => { // goto
+                OpcodeEnum.GoTo => {
                     const offset_high = frame.code[frame.pc + 1];
                     const offset_low = frame.code[frame.pc + 2];
 
-                    const high: i16 = @intCast(offset_high);
-                    const low: i16 = @intCast(offset_low);
+                    const branch_offset: i16 =
+                        (@as(i16, offset_high) << 8) | @as(i16, offset_low);
 
-                    const branch_offset: i16 = (high << 8) | low;
-
-                    const offset: usize = @intCast(branch_offset);
-                    frame.pc += offset - 3;
+                    const pc_i32: i32 = @intCast(frame.pc);
+                    frame.pc = @intCast(pc_i32 + branch_offset);
+                    continue;
                 },
                 OpcodeEnum.IReturn => {
                     const return_value = try frame.operand_stack.pop();
