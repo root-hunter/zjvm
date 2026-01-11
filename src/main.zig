@@ -11,7 +11,19 @@ const ZJVM = @import("engine/vm.zig").ZJVM;
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
-    var file = try std.fs.cwd().openFile("samples/TestSuite6.class", .{ .mode = .read_only });
+    var argv = try std.process.argsWithAllocator(allocator);
+    defer argv.deinit();
+
+    _ = argv.next();
+
+    const class_path = argv.next() orelse {
+        std.debug.print("Usage: zjvm <ClassFilePath>\n", .{});
+        return;
+    };
+
+    std.debug.print("Loading class file: {s}\n", .{class_path});
+
+    var file = try std.fs.cwd().openFile(class_path, .{ .mode = .read_only });
     defer file.close();
 
     const file_size = try file.getEndPos();

@@ -1,4 +1,4 @@
-build-sample:
+build-samples:
 	@echo "Building sample Java class files..."
 	javac samples/*.java
 	@echo "Sample Java class files build complete."
@@ -20,7 +20,8 @@ clean-zjvm:
 
 run: build-zjvm
 	@echo "Running ZJVM..."
-	./zig-out/bin/zjvm
+	./zig-out/bin/zjvm $(ARGS)
+	@echo "Finished"
 
 push: build-zjvm test
 	@echo "Pushing ZJVM to remote repository..."

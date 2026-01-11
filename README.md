@@ -45,7 +45,8 @@ The executable will be generated in `zig-out/bin/zjvm`.
 
 ### Run the sample program
 ```bash
-make run
+make build-samples
+make run ARGS=samples/TestSuite1.class
 ```
 
 This will compile and execute `samples/TestSuite1.class`.
