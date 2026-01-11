@@ -34,6 +34,8 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
             try vm.pushFrame(frame);
             try i.JVMInterpreter.execute(&allocator, &vm);
 
+            try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
+
             var index: usize = 0;
             while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
                 try testing.expectEqual(expectedValues[index], frame.local_vars.get(index));
@@ -78,6 +80,7 @@ test "ZJVM Test Suite 3" {
         .{ .Int = 5 },
         .{ .Int = 2 },
         .{ .Int = 32 },
+        .{ .Int = 0 },
     };
     const filePath = "samples/TestSuite3.class";
     try makeTestSuite(filePath, &expectedValues);
