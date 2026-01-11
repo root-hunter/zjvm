@@ -1,3 +1,8 @@
+build-sample:
+	@echo "Building sample Java class file..."
+	javac samples/TestSuite1.java
+	@echo "Sample Java class file build complete."
+
 build-zjvm:
 	@echo "Building ZJVM..."
 	zig build
@@ -17,7 +22,9 @@ run: build-zjvm
 	@echo "Running ZJVM..."
 	./zig-out/bin/zjvm
 
-build-sample:
-	@echo "Building sample Java class file..."
-	javac samples/TestSuite1.java
-	@echo "Sample Java class file build complete."
+push: build-zjvm test
+	@echo "Pushing ZJVM to remote repository..."
+	git add .
+	git commit -m "Update ZJVM"
+	git push origin main
+	@echo "ZJVM pushed to remote repository."
