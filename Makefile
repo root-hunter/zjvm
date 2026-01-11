@@ -1,3 +1,4 @@
+RELEASE_VERSION = 0.1.5
 RELEASE_MODE ?= safe
 
 build-samples:
@@ -35,9 +36,10 @@ run-release: build-zjvm-release
 	./zig-out/bin/zjvm $(ARGS)
 	@echo "Finished"
 
-push: build-zjvm test
+publish-release: build-zjvm test
 	@echo "Pushing ZJVM to remote repository..."
 	git add .
-	git commit -m "Update ZJVM"
-	git push origin main
+	git tag -a "$(RELEASE_VERSION)" -m "Release version $(RELEASE_VERSION)"
+	git commit -m "Update ZJVM to version $(VERSION)"
+	git push origin main --tags
 	@echo "ZJVM pushed to remote repository."
