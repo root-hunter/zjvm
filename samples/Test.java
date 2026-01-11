@@ -10,5 +10,6 @@ public class Test {
 
         var s3 = 20 + l + g + g + g;
 
+        var s4 = s3 + s2 + l + g + 10;
     }
 }

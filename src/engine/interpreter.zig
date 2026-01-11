@@ -42,6 +42,12 @@ pub const JVMInterpreter = struct {
                     const value: i32 = @intCast(byte); // bipush è signed 8-bit
                     try frame.operand_stack.push(Value{ .Int = value });
                 },
+                OpcodeEnum.ILoad => { // iload
+                    const index_byte = frame.code[frame.pc + 1];
+                    const index: usize = @intCast(index_byte);
+                    const value = frame.local_vars.vars[index];
+                    try frame.operand_stack.push(value);
+                },
                 OpcodeEnum.ILoad1 => { // iload_1
                     const value = frame.local_vars.vars[1];
                     try frame.operand_stack.push(value);

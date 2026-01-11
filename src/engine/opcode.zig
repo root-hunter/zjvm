@@ -7,6 +7,7 @@ pub const OpcodeEnum = enum(u8) {
     IConst4 = 0x07,
     IConst5 = 0x08,
     BiPush = 0x10,
+    ILoad = 0x15,
     ILoad1 = 0x1b,
     ILoad2 = 0x1c,
     ILoad3 = 0x1d,
@@ -32,6 +33,7 @@ pub const OpcodeEnum = enum(u8) {
         return switch (self) {
             OpcodeEnum.BiPush => 2, // 1 byte operand
             OpcodeEnum.IStore => 2, // istore <index>
+            OpcodeEnum.ILoad => 2, // iload <index>
             else => 1, // nessun operand
         };
     }
@@ -46,6 +48,7 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.IConst4 => "iconst_4",
             OpcodeEnum.IConst5 => "iconst_5",
             OpcodeEnum.BiPush => "bipush",
+            OpcodeEnum.ILoad => "iload",
             OpcodeEnum.ILoad1 => "iload_1",
             OpcodeEnum.ILoad2 => "iload_2",
             OpcodeEnum.ILoad3 => "iload_3",
