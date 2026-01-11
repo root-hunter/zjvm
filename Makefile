@@ -3,6 +3,11 @@ build-zjvm:
 	zig build
 	@echo "ZJVM build complete."
 
+test:
+	@echo "Running ZJVM tests..."
+	zig build test
+	@echo "All tests passed!"
+
 clean-zjvm:
 	@echo "Cleaning ZJVM build artifacts..."
 	zig clean

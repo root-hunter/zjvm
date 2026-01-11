@@ -21,3 +21,12 @@ pub fn add(a: i32, b: i32) i32 {
 test "basic add functionality" {
     try std.testing.expect(add(3, 7) == 10);
 }
+
+// Import all test files to include them in the test suite
+test {
+    _ = @import("runtime/value_test.zig");
+    _ = @import("runtime/operand_stack_test.zig");
+    _ = @import("runtime/local_vars_test.zig");
+    _ = @import("runtime/frame_test.zig");
+    _ = @import("engine/opcode_test.zig");
+}
