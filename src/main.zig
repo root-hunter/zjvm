@@ -11,7 +11,7 @@ const ZJVM = @import("engine/vm.zig").ZJVM;
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
-    var file = try std.fs.cwd().openFile("samples/TestSuite1.class", .{ .mode = .read_only });
+    var file = try std.fs.cwd().openFile("samples/TestSuite2.class", .{ .mode = .read_only });
     defer file.close();
 
     const file_size = try file.getEndPos();
@@ -36,9 +36,9 @@ pub fn main() !void {
         if (method.code) |codeAttr| {
             std.debug.print("Starting execution of 'main'...\n", .{});
 
-            var frame = try fr.Frame.init(&allocator, codeAttr);
+            var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            try JVMInterpreter.execute(&vm);
+            try JVMInterpreter.execute(&allocator, &vm);
             frame.dump();
 
             std.debug.print("Execution of 'main' completed.\n", .{});

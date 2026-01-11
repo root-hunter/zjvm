@@ -5,7 +5,7 @@ const OpcodeEnum = @import("opcode.zig").OpcodeEnum;
 const ZJVM = @import("../engine/vm.zig").ZJVM;
 
 pub const JVMInterpreter = struct {
-    pub fn execute(vm: *ZJVM) !void {
+    pub fn execute(allocator: *const std.mem.Allocator, vm: *ZJVM) !void {
         while (true) {
             const frame = vm.currentFrame() orelse return error.NoFrame;
 
@@ -55,6 +55,10 @@ pub const JVMInterpreter = struct {
                     const index_byte = frame.code[frame.pc + 1];
                     const index: usize = @intCast(index_byte);
                     const value = frame.local_vars.vars[index];
+                    try frame.operand_stack.push(value);
+                },
+                OpcodeEnum.ILoad0 => { // iload_0
+                    const value = frame.local_vars.vars[0];
                     try frame.operand_stack.push(value);
                 },
                 OpcodeEnum.ILoad1 => { // iload_1
@@ -116,17 +120,59 @@ pub const JVMInterpreter = struct {
                     const a = (try frame.operand_stack.pop()).Int;
                     try frame.operand_stack.push(Value{ .Int = a + b });
                 },
+                OpcodeEnum.IMul => { // imul
+                    const b = (try frame.operand_stack.pop()).Int;
+                    const a = (try frame.operand_stack.pop()).Int;
+                    try frame.operand_stack.push(Value{ .Int = a * b });
+                },
                 OpcodeEnum.InvokeStatic => {
-                    return error.UnsupportedOperation;
+                    const index_high = frame.code[frame.pc + 1];
+                    const index_low = frame.code[frame.pc + 2];
+
+                    const high: u16 = @intCast(index_high);
+                    const low: u16 = @intCast(index_low);
+
+                    const method_index: u16 = (high << 8) | low;
+
+                    const method_name = try frame.class.getConstant(method_index);
+                    const method = try frame.class.getMethod(method_name);
+
+                    if (method == null) {
+                        return error.MethodNotFound;
+                    }
+
+                    const codeAttr = method.?.code orelse return error.NoCodeAttribute;
+
+                    var new_frame = try Frame.init(allocator, codeAttr, frame.class);
+
+                    for (0..method.?.num_params) |i| {
+                        const arg = try frame.operand_stack.pop();
+                        new_frame.local_vars.vars[method.?.num_params - 1 - i] = arg;
+                    }
+
+                    try vm.pushFrame(new_frame);
                 },
                 OpcodeEnum.IReturn => {
-                    _ = try frame.operand_stack.pop();
-                    return;
+                    const return_value = try frame.operand_stack.pop();
+
+                    _ = try vm.stack.pop();
+
+                    if (vm.stack.top == 0) {
+                        break;
+                    }
+
+                    var caller = vm.stack.current();
+                    try caller.operand_stack.push(return_value);
+
+                    continue;
                 },
                 OpcodeEnum.Return => { // return
+                    _ = try vm.stack.pop();
                     return;
                 },
             }
+
+            frame.dump();
 
             frame.pc += opcode.getOperandLength();
         }

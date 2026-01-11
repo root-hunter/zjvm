@@ -19,6 +19,7 @@ pub const MethodInfo = struct {
     // ZJVM additions
     name: []const u8,
     descriptor: []const u8,
+    num_params: usize,
 
     pub fn parse(allocator: *const std.mem.Allocator, class: *const p.ClassInfo, cursor: *utils.Cursor) !MethodInfo {
         var self = MethodInfo{
@@ -31,6 +32,7 @@ pub const MethodInfo = struct {
             .code = null,
             .name = &[_]u8{},
             .descriptor = &[_]u8{},
+            .num_params = 0,
         };
 
         self.access_flags = try cursor.readU2();
@@ -44,6 +46,7 @@ pub const MethodInfo = struct {
         const count: usize = @intCast(self.attributes_count);
         self.attributes = try a.AttributesInfo.parseAll(self.allocator, cursor, count, class);
 
+        self.num_params = try utils.countMethodParameters(self.descriptor);
         self.code = try self.parseCodeAttribute(class);
 
         return self;

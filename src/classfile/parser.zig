@@ -155,19 +155,41 @@ pub const ClassInfo = struct {
             const cp_entry = constantPool[@intCast(index - 1)];
             return switch (cp_entry) {
                 .Utf8 => |str| str,
-                else => return error.InvalidConstantPoolEntry,
+                .Methodref => |methodref| {
+                    const name_and_type_cp = constantPool[@intCast(methodref.name_and_type_index - 1)];
+                    return switch (name_and_type_cp) {
+                        .NameAndType => |name_and_type| {
+                            const name_cp = constantPool[@intCast(name_and_type.name_index - 1)];
+                            return switch (name_cp) {
+                                .Utf8 => |name_str| name_str,
+                                else => {
+                                    std.debug.print("Error: NameAndType entry at index {d} does not point to a Utf8 entry for name. Found: {s}\n", .{ name_and_type.name_index, @tagName(name_cp) });
+                                    return error.InvalidConstantPoolEntry;
+                                },
+                            };
+                        },
+                        else => {
+                            std.debug.print("Error: Methodref entry at index {d} does not point to a NameAndType entry. Found: {s}\n", .{ methodref.name_and_type_index, @tagName(name_and_type_cp) });
+                            return error.InvalidConstantPoolEntry;
+                        },
+                    };
+                },
+                else => {
+                    std.debug.print("Error: Constant pool entry at index {d} is not a Utf8 entry. Found: {s}\n", .{ index, @tagName(cp_entry) });
+                    return error.InvalidConstantPoolEntry;
+                },
             };
         } else {
             return error.ConstantPoolNotInitialized;
         }
     }
 
-    pub fn getMethodName(self: *ClassInfo, method: MethodInfo) ![]const u8 {
+    pub fn getMethodName(self: *const ClassInfo, method: MethodInfo) ![]const u8 {
         const name_index = method.name_index;
         return self.getConstant(name_index);
     }
 
-    fn setClassName(self: *ClassInfo) ![]const u8 {
+    fn setClassName(self: *const ClassInfo) ![]const u8 {
         const class_cp = self.constant_pool.?[@intCast(self.this_class - 1)];
         return switch (class_cp) {
             .Class => |name_index| self.getConstant(name_index),
@@ -214,7 +236,7 @@ pub const ClassInfo = struct {
         }
     }
 
-    pub fn getMethod(self: *ClassInfo, name: []const u8) !?MethodInfo {
+    pub fn getMethod(self: *const ClassInfo, name: []const u8) !?MethodInfo {
         if (self.methods) |methods| {
             for (methods) |method| {
                 const method_name = try self.getConstant(method.name_index);
