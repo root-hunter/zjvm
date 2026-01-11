@@ -4,7 +4,7 @@ const Value = @import("value.zig").Value;
 pub const LocalVars = struct {
     vars: []Value,
 
-    pub fn init(allocator: *std.mem.Allocator, count: usize) !LocalVars {
+    pub fn init(allocator: *const std.mem.Allocator, count: usize) !LocalVars {
         return LocalVars{
             .vars = try allocator.alloc(Value, count),
         };

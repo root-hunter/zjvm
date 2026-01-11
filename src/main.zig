@@ -4,6 +4,10 @@ const parser = @import("classfile/parser.zig");
 const ac = @import("classfile/access_flags.zig");
 const utils = @import("classfile/utils.zig");
 
+const fr = @import("runtime/frame.zig");
+
+const JVMInterpreter = @import("engine/interpreter.zig").JVMInterpreter;
+
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
@@ -25,6 +29,22 @@ pub fn main() !void {
     std.debug.print("Method 'main' found: {any}\n", .{mMain});
 
     try classInfo.dump();
+
+    if (mMain) |method| {
+        if (method.code) |codeAttr| {
+            codeAttr.dump();
+
+            std.debug.print("Starting execution of 'main'...\n", .{});
+            std.debug.print("Code Op: {any}\n", .{codeAttr.code});
+
+            var frame = try fr.Frame.init(&allocator, codeAttr);
+            try JVMInterpreter.execute(&frame);
+
+            std.debug.print("Execution of 'main' completed.\n", .{});
+        } else {
+            std.debug.print("No code attribute found for method 'main'\n", .{});
+        }
+    }
 
     try zjvm.bufferedPrint();
 }
