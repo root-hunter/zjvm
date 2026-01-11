@@ -1,4 +1,4 @@
-RELEASE_VERSION = 0.1.6
+RELEASE_VERSION = v0.1.7
 RELEASE_MODE ?= safe
 
 build-samples:
