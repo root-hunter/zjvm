@@ -4,6 +4,7 @@ pub const ValueTag = enum(u8) {
     Long = 3,
     Double = 4,
     Reference = 5,
+    ArrayRef = 6,
 };
 
 pub const Value = union(ValueTag) {
@@ -12,4 +13,5 @@ pub const Value = union(ValueTag) {
     Long: i64,
     Double: f64,
     Reference: usize,
+    ArrayRef: ?*[]Value,
 };

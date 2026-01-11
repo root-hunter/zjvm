@@ -36,13 +36,45 @@ pub const JVMInterpreter = struct {
                     frame.pc += 1;
                     try frame.operand_stack.push(Value{ .Int = @intCast(byte) });
                 },
+                OpcodeEnum.ILoad1 => { // iload_1
+                    const value = frame.local_vars.vars[1];
+                    try frame.operand_stack.push(value);
+                },
+                OpcodeEnum.ISub => { // isub
+                    const b = (try frame.operand_stack.pop()).Int;
+                    const a = (try frame.operand_stack.pop()).Int;
+                    try frame.operand_stack.push(Value{ .Int = a - b });
+                },
                 OpcodeEnum.LLoad3 => { // lload_3
                     const value = frame.local_vars.vars[3];
                     try frame.operand_stack.push(value);
                 },
+                OpcodeEnum.AALoad => { // aaload
+                    const index_value = try frame.operand_stack.pop();
+                    const arrayref_value = try frame.operand_stack.pop();
+
+                    const arrayref = arrayref_value.ArrayRef;
+
+                    if (arrayref == null) {
+                        return error.NullPointerException;
+                    }
+
+                    const index: usize = @intCast(index_value.Int);
+
+                    const element = arrayref.?.*[index];
+                    try frame.operand_stack.push(element);
+                },
                 OpcodeEnum.IStore1 => { // istore_1
                     const value = try frame.operand_stack.pop();
                     frame.local_vars.vars[1] = value;
+                },
+                OpcodeEnum.IStore2 => { // istore_2
+                    const value = try frame.operand_stack.pop();
+                    frame.local_vars.vars[2] = value;
+                },
+                OpcodeEnum.IStore3 => { // istore_3
+                    const value = try frame.operand_stack.pop();
+                    frame.local_vars.vars[3] = value;
                 },
                 OpcodeEnum.IAdd => { // iadd
                     const b = (try frame.operand_stack.pop()).Int;
