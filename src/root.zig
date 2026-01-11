@@ -136,6 +136,22 @@ test "ZJVM Test Suite 7" {
     try makeTestSuite(filePath, &expectedValues);
 }
 
+test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
+    const expectedValues = [_]v.Value{
+        .{ .Int = 0 },
+        .{ .Int = 5 },
+        .{ .Int = 5 },
+        .{ .Int = 10 },
+        .{ .Int = 55 },
+        .{ .Int = 15 },
+        .{ .Int = 610 },
+        .{ .Int = 20 },
+        .{ .Int = 6765 },
+    };
+    const filePath = "samples/TestSuite8.class";
+    try makeTestSuite(filePath, &expectedValues);
+}
+
 // Import all test files to include them in the test suite
 test {
     _ = @import("runtime/value_test.zig");

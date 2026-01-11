@@ -195,6 +195,24 @@ pub const JVMInterpreter = struct {
                         continue;
                     }
                 },
+                OpcodeEnum.IfCmpGt => { // if_icmpgt
+                    const value2 = try frame.operand_stack.pop();
+                    const value1 = try frame.operand_stack.pop();
+
+                    const offset_high = frame.code[frame.pc + 1];
+                    const offset_low = frame.code[frame.pc + 2];
+
+                    const high: i16 = @intCast(offset_high);
+                    const low: i16 = @intCast(offset_low);
+
+                    const branch_offset: i16 = (high << 8) | low;
+
+                    if (value1.Int > value2.Int) {
+                        const b: i32 = @intCast(frame.pc);
+                        frame.pc = @intCast(b + branch_offset);
+                        continue;
+                    }
+                },
                 OpcodeEnum.IfCmpLe => { // if_icmple
                     const value2 = try frame.operand_stack.pop();
                     const value1 = try frame.operand_stack.pop();
