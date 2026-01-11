@@ -5,5 +5,7 @@ public class Test {
         var g = 100;
 
         var l = 50 + s;
+
+        var s2 = 20 + l;
     }
 }

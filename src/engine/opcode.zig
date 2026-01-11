@@ -18,6 +18,20 @@ pub const OpcodeEnum = enum(u8) {
     IReturn = 0xac,
     Return = 0xb1,
 
+    pub fn getOperandFormat(self: OpcodeEnum) OperandFormat {
+        return switch (self) {
+            OpcodeEnum.BiPush => OperandFormat.Byte,
+            else => OperandFormat.NoOperand,
+        };
+    }
+
+    pub fn getOperandLength(self: OpcodeEnum) usize {
+        return switch (self) {
+            OpcodeEnum.BiPush => 2,
+            else => 1,
+        };
+    }
+
     pub fn toString(self: OpcodeEnum) []const u8 {
         return switch (self) {
             OpcodeEnum.IConstM1 => "iconst_m1",
@@ -40,4 +54,12 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.Return => "return",
         };
     }
+};
+
+pub const OperandFormat = enum {
+    NoOperand,
+    Byte,
+    Short,
+    Int,
+    BranchOffset,
 };

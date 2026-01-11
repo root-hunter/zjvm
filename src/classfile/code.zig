@@ -3,7 +3,7 @@ const types = @import("types.zig");
 const Cursor = @import("utils.zig").Cursor;
 const AttributesInfo = @import("attributes.zig").AttributesInfo;
 const p = @import("parser.zig");
-const OpcodeEnum = @import("../engine/opcode.zig").OpcodeEnum;
+const o = @import("../engine/opcode.zig");
 
 pub const ExceptionTableEntry = struct {
     start_pc: types.U2,
@@ -87,20 +87,70 @@ pub const CodeAttribute = struct {
         std.debug.print("      Attributes Count: {}\n", .{self.attributes.len});
     }
 
-    pub fn dumpOpcodes(self: *const CodeAttribute) void {
+    pub fn dumpOpcodes(self: *const CodeAttribute) !void {
         std.debug.print("    Raw Opcodes: {any}\n", .{self.code});
         std.debug.print("      Opcodes:\n", .{});
-        var i: usize = 0;
-        while (i < self.code.len) : (i += 1) {
-            const opcode = self.code[i];
-            const opcode_enum: ?OpcodeEnum = @enumFromInt(opcode);
 
-            if (opcode_enum == null) {
-                std.debug.print("        {d}: Unknown Opcode {x}\n", .{ i, opcode });
+        var pc: usize = 0;
+        while (pc < self.code.len) {
+            const byte = self.code[pc];
+
+            const result = std.meta.intToEnum(o.OpcodeEnum, byte);
+
+            if (result == error.InvalidEnumTag) {
+                std.debug.print("        {d}: <unknown 0x{x}>\n", .{ pc, byte });
+                pc += 1;
                 continue;
             }
 
-            std.debug.print("        {d}: {s}\n", .{ i, opcode_enum.?.toString() });
+            const maybe_opcode: ?o.OpcodeEnum = @enumFromInt(byte);
+
+            if (maybe_opcode == null) {
+                std.debug.print("        {d}: <unknown 0x{x}>\n", .{ pc, byte });
+                pc += 1;
+                continue;
+            }
+
+            const opcode = maybe_opcode.?;
+            const operand_len = opcode.getOperandLength();
+            const operand_fmt = opcode.getOperandFormat();
+
+            // Stampa base
+            std.debug.print("        {d}: {s}", .{ pc, opcode.toString() });
+
+            // Stampa operandi se presenti
+            switch (operand_fmt) {
+                .Byte => {
+                    const value = @as(i8, @bitCast(self.code[pc + 1]));
+                    std.debug.print(" {d}", .{value});
+                },
+                .Short => {
+                    const hi = self.code[pc + 1];
+                    const lo = self.code[pc + 2];
+                    const value = @as(i16, @bitCast((@as(u16, hi) << 8) | lo));
+                    std.debug.print(" {d}", .{value});
+                },
+                .Int => {
+                    const b0 = self.code[pc + 1];
+                    const b1 = self.code[pc + 2];
+                    const b2 = self.code[pc + 3];
+                    const b3 = self.code[pc + 4];
+                    const value = @as(i32, @bitCast((@as(u32, b0) << 24) | (@as(u32, b1) << 16) | (@as(u32, b2) << 8) | b3));
+                    std.debug.print(" {d}", .{value});
+                },
+                .BranchOffset => {
+                    // offset a 2 byte
+                    const hi = self.code[pc + 1];
+                    const lo = self.code[pc + 2];
+                    const offset = @as(i16, @bitCast((@as(u16, hi) << 8) | lo));
+                    std.debug.print(" {d}", .{offset});
+                },
+                .NoOperand => {},
+            }
+
+            std.debug.print("\n", .{});
+
+            pc += operand_len;
         }
     }
 
