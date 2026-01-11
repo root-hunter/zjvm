@@ -174,6 +174,10 @@ pub const ClassInfo = struct {
                         },
                     };
                 },
+                .Double => |double_const| {
+
+                    // TODO handle double constant retrieval
+                },
                 else => {
                     std.debug.print("Error: Constant pool entry at index {d} is not a Utf8 entry. Found: {s}\n", .{ index, @tagName(cp_entry) });
                     return error.InvalidConstantPoolEntry;

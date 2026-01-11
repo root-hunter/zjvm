@@ -72,6 +72,30 @@ pub const JVMInterpreter = struct {
 
                     try frame.operand_stack.push(Value{ .Int = value });
                 },
+                OpcodeEnum.LDC2_W => {
+                    const index_high = frame.code[frame.pc + 1];
+                    const index_low = frame.code[frame.pc + 2];
+
+                    const index: u16 = (@as(u16, index_high) << 8) | @as(u16, index_low);
+
+                    const constant_bytes = try frame.class.getConstant(index);
+
+                    if (constant_bytes.len == 8) {
+                        // prova long
+                        const slice = constant_bytes[0..8];
+
+                        const long_value = std.mem.readInt(i64, slice, .big);
+                        try frame.operand_stack.push(Value{ .Long = long_value });
+                    } else if (constant_bytes.len == 8) {
+                        // prova double
+                        const slice = constant_bytes[0..8];
+                        const uvalue: u64 = std.mem.readInt(u64, slice, .big);
+                        const double_value: f64 = @bitCast(uvalue);
+                        try frame.operand_stack.push(Value{ .Double = double_value });
+                    } else {
+                        return error.InvalidConstantType;
+                    }
+                },
                 OpcodeEnum.ILoad => { // iload
                     const index_byte = frame.code[frame.pc + 1];
                     const index: usize = @intCast(index_byte);
