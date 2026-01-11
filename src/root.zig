@@ -11,19 +11,14 @@ test "ZJVM Test Suite 1" {
 
     const testing = std.testing;
 
-    // This test exists to ensure that the test suite runs all tests in the project.
-    // Individual test files are imported below.
-
     const allocator = std.heap.page_allocator;
-    // You can add any global setup code for tests here if needed.
+
     var file = try std.fs.cwd().openFile("samples/TestSuite1.class", .{ .mode = .read_only });
     defer file.close();
 
     const file_size = try file.getEndPos();
     const data = try file.readToEndAlloc(allocator, file_size);
     defer allocator.free(data);
-
-    // Global teardown code can go here if needed.
 
     var cursor = utils.Cursor.init(data);
     var classInfo = parser.ClassInfo.init(&allocator);
