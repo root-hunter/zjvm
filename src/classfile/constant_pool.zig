@@ -22,7 +22,7 @@ pub const CpTag = enum(types.U1) {
     Package = 20,
 };
 
-pub const ConstantPoolInfo = union(CpTag) {
+pub const ConstantPoolEntry = union(CpTag) {
     Utf8: []const u8,
     Integer: i32,
     Float: f32,
@@ -62,7 +62,7 @@ pub const ConstantPoolInfo = union(CpTag) {
     Module: u16,
     Package: u16,
 
-    pub fn parse(cursor: *utils.Cursor) !ConstantPoolInfo {
+    pub fn parse(cursor: *utils.Cursor) !ConstantPoolEntry {
         const tag = try cursor.readU1();
         const tag_enum: CpTag = @enumFromInt(tag);
 
@@ -70,87 +70,87 @@ pub const ConstantPoolInfo = union(CpTag) {
             CpTag.Utf8 => |_| {
                 const length = try cursor.readU2();
                 const bytes = try cursor.readBytes(@intCast(length));
-                return ConstantPoolInfo{ .Utf8 = bytes };
+                return ConstantPoolEntry{ .Utf8 = bytes };
             },
             CpTag.Integer => |_| {
                 const value = try cursor.readU4();
-                return ConstantPoolInfo{ .Integer = @intCast(value) };
+                return ConstantPoolEntry{ .Integer = @intCast(value) };
             },
             CpTag.Float => |_| {
                 const value = try cursor.readU4();
-                return ConstantPoolInfo{ .Float = @bitCast(value) };
+                return ConstantPoolEntry{ .Float = @bitCast(value) };
             },
             CpTag.Long => |_| {
                 const high_bytes = try cursor.readU4();
                 const low_bytes = try cursor.readU4();
                 const value = (@as(u64, high_bytes) << 32) | @as(u64, low_bytes);
-                return ConstantPoolInfo{ .Long = @intCast(value) };
+                return ConstantPoolEntry{ .Long = @intCast(value) };
             },
             CpTag.Double => |_| {
                 const high_bytes = try cursor.readU4();
                 const low_bytes = try cursor.readU4();
                 const value = (@as(u64, high_bytes) << 32) | @as(u64, low_bytes);
-                return ConstantPoolInfo{ .Double = @bitCast(value) };
+                return ConstantPoolEntry{ .Double = @bitCast(value) };
             },
             CpTag.Class => |_| {
                 const name_index = try cursor.readU2();
-                return ConstantPoolInfo{ .Class = name_index };
+                return ConstantPoolEntry{ .Class = name_index };
             },
             CpTag.String => |_| {
                 const string_index = try cursor.readU2();
-                return ConstantPoolInfo{ .String = string_index };
+                return ConstantPoolEntry{ .String = string_index };
             },
             CpTag.Fieldref => |_| {
                 const class_index = try cursor.readU2();
                 const name_and_type_index = try cursor.readU2();
-                return ConstantPoolInfo{ .Fieldref = .{ .class_index = class_index, .name_and_type_index = name_and_type_index } };
+                return ConstantPoolEntry{ .Fieldref = .{ .class_index = class_index, .name_and_type_index = name_and_type_index } };
             },
             CpTag.Methodref => |_| {
                 const class_index = try cursor.readU2();
                 const name_and_type_index = try cursor.readU2();
-                return ConstantPoolInfo{ .Methodref = .{ .class_index = class_index, .name_and_type_index = name_and_type_index } };
+                return ConstantPoolEntry{ .Methodref = .{ .class_index = class_index, .name_and_type_index = name_and_type_index } };
             },
             CpTag.InterfaceMethodref => |_| {
                 const class_index = try cursor.readU2();
                 const name_and_type_index = try cursor.readU2();
-                return ConstantPoolInfo{ .InterfaceMethodref = .{ .class_index = class_index, .name_and_type_index = name_and_type_index } };
+                return ConstantPoolEntry{ .InterfaceMethodref = .{ .class_index = class_index, .name_and_type_index = name_and_type_index } };
             },
             CpTag.NameAndType => |_| {
                 const name_index = try cursor.readU2();
                 const descriptor_index = try cursor.readU2();
-                return ConstantPoolInfo{ .NameAndType = .{ .name_index = name_index, .descriptor_index = descriptor_index } };
+                return ConstantPoolEntry{ .NameAndType = .{ .name_index = name_index, .descriptor_index = descriptor_index } };
             },
             CpTag.MethodHandle => |_| {
                 const reference_kind = try cursor.readU1();
                 const reference_index = try cursor.readU2();
-                return ConstantPoolInfo{ .MethodHandle = .{ .reference_kind = reference_kind, .reference_index = reference_index } };
+                return ConstantPoolEntry{ .MethodHandle = .{ .reference_kind = reference_kind, .reference_index = reference_index } };
             },
             CpTag.MethodType => |_| {
                 const descriptor_index = try cursor.readU2();
-                return ConstantPoolInfo{ .MethodType = descriptor_index };
+                return ConstantPoolEntry{ .MethodType = descriptor_index };
             },
             CpTag.Dynamic => |_| {
                 const bootstrap_method_attr_index = try cursor.readU2();
                 const name_and_type_index = try cursor.readU2();
-                return ConstantPoolInfo{ .Dynamic = .{ .bootstrap_method_attr_index = bootstrap_method_attr_index, .name_and_type_index = name_and_type_index } };
+                return ConstantPoolEntry{ .Dynamic = .{ .bootstrap_method_attr_index = bootstrap_method_attr_index, .name_and_type_index = name_and_type_index } };
             },
             CpTag.InvokeDynamic => |_| {
                 const bootstrap_method_attr_index = try cursor.readU2();
                 const name_and_type_index = try cursor.readU2();
-                return ConstantPoolInfo{ .InvokeDynamic = .{ .bootstrap_method_attr_index = bootstrap_method_attr_index, .name_and_type_index = name_and_type_index } };
+                return ConstantPoolEntry{ .InvokeDynamic = .{ .bootstrap_method_attr_index = bootstrap_method_attr_index, .name_and_type_index = name_and_type_index } };
             },
             CpTag.Module => |_| {
                 const name_index = try cursor.readU2();
-                return ConstantPoolInfo{ .Module = name_index };
+                return ConstantPoolEntry{ .Module = name_index };
             },
             CpTag.Package => |_| {
                 const name_index = try cursor.readU2();
-                return ConstantPoolInfo{ .Package = name_index };
+                return ConstantPoolEntry{ .Package = name_index };
             },
         }
     }
 
-    pub fn toString(self: ConstantPoolInfo) []const u8 {
+    pub fn toString(self: ConstantPoolEntry) []const u8 {
         return switch (self) {
             .Utf8 => |str| str,
             .Integer => |val| std.fmt.allocPrint(std.heap.page_allocator, "Integer: {}", .{val}) catch "Integer: <error>",

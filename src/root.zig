@@ -48,7 +48,7 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
 
 test "ZJVM Test Suite 1" {
     const expectedValues = [_]v.Value{
-        .{ .Int = 0 },
+        .{ .Top = {} },
         .{ .Int = 33 },
         .{ .Int = 100 },
         .{ .Int = 83 },
@@ -63,7 +63,7 @@ test "ZJVM Test Suite 1" {
 
 test "ZJVM Test Suite 2" {
     const expectedValues = [_]v.Value{
-        .{ .Int = 0 },
+        .{ .Top = {} },
         .{ .Int = 5 },
         .{ .Int = 10 },
         .{ .Int = 50 },
@@ -75,7 +75,7 @@ test "ZJVM Test Suite 2" {
 
 test "ZJVM Test Suite 3" {
     const expectedValues = [_]v.Value{
-        .{ .Int = 0 },
+        .{ .Top = {} },
         .{ .Int = 10 },
         .{ .Int = 5 },
         .{ .Int = 2 },
@@ -88,7 +88,7 @@ test "ZJVM Test Suite 3" {
 
 test "ZJVM Test Suite 4" {
     const expectedValues = [_]v.Value{
-        .{ .Int = 0 },
+        .{ .Top = {} },
         .{ .Int = 3200 },
         .{ .Int = 8 },
         .{ .Int = 25600 },
@@ -103,7 +103,7 @@ test "ZJVM Test Suite 4" {
 
 test "ZJVM Test Suite 5" {
     const expectedValues = [_]v.Value{
-        .{ .Int = 0 },
+        .{ .Top = {} },
         .{ .Int = 12 },
         .{ .Int = 4 },
         .{ .Int = 20736 },
@@ -114,7 +114,7 @@ test "ZJVM Test Suite 5" {
 
 test "ZJVM Test Suite 6" {
     const expectedValues = [_]v.Value{
-        .{ .Int = 0 },
+        .{ .Top = {} },
         .{ .Int = 12 },
         .{ .Int = 10000 },
         .{ .Int = 50135000 },
@@ -126,7 +126,7 @@ test "ZJVM Test Suite 6" {
 
 test "ZJVM Test Suite 7" {
     const expectedValues = [_]v.Value{
-        .{ .Int = 0 },
+        .{ .Top = {} },
         .{ .Int = 5 },
         .{ .Int = 20 },
         .{ .Int = 830 },
@@ -138,7 +138,7 @@ test "ZJVM Test Suite 7" {
 
 test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
     const expectedValues = [_]v.Value{
-        .{ .Int = 0 },
+        .{ .Top = {} },
         .{ .Int = 5 },
         .{ .Int = 5 },
         .{ .Int = 10 },

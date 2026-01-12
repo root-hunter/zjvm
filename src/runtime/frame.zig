@@ -38,6 +38,7 @@ pub const Frame = struct {
         for (self.local_vars.vars, 0..) |val, i| {
             std.debug.print("  [{}] = ", .{i});
             switch (val) {
+                v.ValueTag.Top => std.debug.print("<reserved>\n", .{}),
                 v.ValueTag.Int => std.debug.print("{d} (Int)\n", .{val.Int}),
                 v.ValueTag.Float => std.debug.print("{d} (Float)\n", .{val.Float}),
                 v.ValueTag.Long => std.debug.print("{d} (Long)\n", .{val.Long}),

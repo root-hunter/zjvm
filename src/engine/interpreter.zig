@@ -32,7 +32,7 @@ pub const JVMInterpreter = struct {
                     try frame.operand_stack.push(Value{ .Float = 2.0 });
                 },
                 OpcodeEnum.DConst0 => { // dconst_0
-                    try frame.operand_stack.push(Value{ .Double = 0.0 });
+                    try frame.operand_stack.pushDouble(0.0);
                 },
                 OpcodeEnum.IConstM1 => { // iconst_m1
                     try frame.operand_stack.push(Value{ .Int = -1 });
@@ -72,6 +72,26 @@ pub const JVMInterpreter = struct {
 
                     try frame.operand_stack.push(Value{ .Int = value });
                 },
+                OpcodeEnum.LDC2_W => {
+                    const index_high = @as(u16, frame.code[frame.pc + 1]);
+                    const index_low = @as(u16, frame.code[frame.pc + 2]);
+
+                    const index: u16 = (index_high << 8) | index_low;
+
+                    const entry = try frame.class.getCpEntry(index);
+
+                    switch (entry) {
+                        .Long => |long_value| {
+                            try frame.operand_stack.pushLong(long_value);
+                        },
+                        .Double => |double_value| {
+                            try frame.operand_stack.pushDouble(double_value);
+                        },
+                        else => {
+                            return error.InvalidConstantType;
+                        },
+                    }
+                },
                 OpcodeEnum.ILoad => { // iload
                     const index_byte = frame.code[frame.pc + 1];
                     const index: usize = @intCast(index_byte);
@@ -94,14 +114,29 @@ pub const JVMInterpreter = struct {
                     const value = frame.local_vars.vars[3];
                     try frame.operand_stack.push(value);
                 },
-                OpcodeEnum.ISub => { // isub
-                    const b = (try frame.operand_stack.pop()).Int;
-                    const a = (try frame.operand_stack.pop()).Int;
-                    try frame.operand_stack.push(Value{ .Int = a - b });
-                },
                 OpcodeEnum.LLoad3 => { // lload_3
                     const value = frame.local_vars.vars[3];
                     try frame.operand_stack.push(value);
+                },
+                OpcodeEnum.DLoad => { // dload
+                    const index: usize = @intCast(frame.code[frame.pc + 1]);
+                    const v = frame.local_vars.vars[index];
+
+                    switch (v) {
+                        .Double => |d| {
+                            // skip Top slot implicitly
+                            try frame.operand_stack.pushDouble(d);
+                        },
+                        else => return error.TypeMismatch,
+                    }
+                },
+                OpcodeEnum.DLoad1 => { // dload_1
+                    const value = frame.local_vars.vars[1];
+                    try frame.operand_stack.pushDouble(value.Double);
+                },
+                OpcodeEnum.DLoad3 => { // dload_3
+                    const value = frame.local_vars.vars[3];
+                    try frame.operand_stack.pushDouble(value.Double);
                 },
                 OpcodeEnum.AALoad => { // aaload
                     const index_value = try frame.operand_stack.pop();
@@ -140,15 +175,50 @@ pub const JVMInterpreter = struct {
                     const value = try frame.operand_stack.pop();
                     frame.local_vars.vars[3] = value;
                 },
+                OpcodeEnum.DStore => { // dstore
+                    const index: usize = @intCast(frame.code[frame.pc + 1]);
+                    const v = try frame.operand_stack.popDouble();
+
+                    frame.local_vars.vars[index] = Value{ .Double = v };
+                    frame.local_vars.vars[index + 1] = Value.Top;
+                },
+                OpcodeEnum.DStore1 => { // dstore_1
+                    const value = try frame.operand_stack.popDouble();
+                    frame.local_vars.vars[1] = Value{ .Double = value };
+                },
+                OpcodeEnum.DStore3 => { // dstore_3
+                    const value = try frame.operand_stack.popDouble();
+                    frame.local_vars.vars[3] = Value{ .Double = value };
+                },
+                OpcodeEnum.ISub => { // isub
+                    const b = (try frame.operand_stack.pop()).Int;
+                    const a = (try frame.operand_stack.pop()).Int;
+                    try frame.operand_stack.push(Value{ .Int = a - b });
+                },
+                OpcodeEnum.DSub => { // dsub
+                    const b = (try frame.operand_stack.popDouble());
+                    const a = (try frame.operand_stack.popDouble());
+                    try frame.operand_stack.pushDouble(a - b);
+                },
                 OpcodeEnum.IAdd => { // iadd
                     const b = (try frame.operand_stack.pop()).Int;
                     const a = (try frame.operand_stack.pop()).Int;
                     try frame.operand_stack.push(Value{ .Int = a + b });
                 },
+                OpcodeEnum.DAdd => { // dadd
+                    const b = (try frame.operand_stack.popDouble());
+                    const a = (try frame.operand_stack.popDouble());
+                    try frame.operand_stack.pushDouble(a + b);
+                },
                 OpcodeEnum.IMul => { // imul
                     const b = (try frame.operand_stack.pop()).Int;
                     const a = (try frame.operand_stack.pop()).Int;
                     try frame.operand_stack.push(Value{ .Int = a * b });
+                },
+                OpcodeEnum.DMul => { // dmul
+                    const b = (try frame.operand_stack.popDouble());
+                    const a = (try frame.operand_stack.popDouble());
+                    try frame.operand_stack.pushDouble(a * b);
                 },
                 OpcodeEnum.IDiv => { // idiv
                     const b = (try frame.operand_stack.pop()).Int;
@@ -158,6 +228,14 @@ pub const JVMInterpreter = struct {
                     }
                     try frame.operand_stack.push(Value{ .Int = @divFloor(a, b) });
                 },
+                OpcodeEnum.DDiv => { // ddiv
+                    const b = (try frame.operand_stack.popDouble());
+                    const a = (try frame.operand_stack.popDouble());
+                    if (b == 0.0) {
+                        return error.ArithmeticException;
+                    }
+                    try frame.operand_stack.pushDouble(a / b);
+                },
                 OpcodeEnum.IRem => { // irem
                     const b = (try frame.operand_stack.pop()).Int;
                     const a = (try frame.operand_stack.pop()).Int;
@@ -165,6 +243,14 @@ pub const JVMInterpreter = struct {
                         return error.ArithmeticException;
                     }
                     try frame.operand_stack.push(Value{ .Int = @rem(a, b) });
+                },
+                OpcodeEnum.LxOr => { // lxor
+                    const value2 = try frame.operand_stack.pop();
+                    const value1 = try frame.operand_stack.pop();
+
+                    const r: i64 = value1.Long ^ value2.Long;
+
+                    try frame.operand_stack.push(Value{ .Long = r });
                 },
                 OpcodeEnum.IInc => { // iinc
                     const index_byte = frame.code[frame.pc + 1];
@@ -176,6 +262,19 @@ pub const JVMInterpreter = struct {
                     var current_value = frame.local_vars.vars[index].Int;
                     current_value += increment;
                     frame.local_vars.vars[index] = Value{ .Int = current_value };
+                },
+                OpcodeEnum.D2I => {
+                    const d = try frame.operand_stack.popDouble();
+
+                    const i: i32 =
+                        if (std.math.isNan(d)) 0 else if (d > @as(f64, std.math.maxInt(i32)))
+                            std.math.maxInt(i32)
+                        else if (d < @as(f64, std.math.minInt(i32)))
+                            std.math.minInt(i32)
+                        else
+                            @intFromFloat(d);
+
+                    try frame.operand_stack.push(Value{ .Int = i });
                 },
                 OpcodeEnum.IfCmpGe => { // if_icmpge
                     const value2 = try frame.operand_stack.pop();

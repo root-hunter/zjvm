@@ -10,9 +10,9 @@ test "LocalVars - init with default values" {
 
     try testing.expectEqual(@as(usize, 5), locals.vars.len);
 
-    // All should be initialized to Int: 0
+    // All should be initialized to Top
     for (locals.vars) |v| {
-        try testing.expectEqual(@as(i32, 0), v.Int);
+        try testing.expectEqual(@as(void, {}), v.Top);
     }
 }
 
@@ -36,7 +36,7 @@ test "LocalVars - set and get" {
 
     // Index 1 and 3 should still be default (0)
     const v1 = locals.get(1);
-    try testing.expectEqual(@as(i32, 0), v1.Int);
+    try testing.expectEqual(@as(void, {}), v1.Top);
 }
 
 test "LocalVars - overwrite values" {

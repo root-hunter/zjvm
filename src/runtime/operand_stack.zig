@@ -27,4 +27,57 @@ pub const OperandStack = struct {
         self.top -= 1;
         return self.data[self.top];
     }
+
+    pub fn pushLong(self: *OperandStack, v: i64) !void {
+        self.data[self.top] = Value{ .Long = v };
+        self.data[self.top + 1] = Value.Top;
+        self.top += 2;
+    }
+
+    pub fn popLong(self: *OperandStack) !i64 {
+        if (self.top == 0)
+            return error.StackUnderflow;
+
+        const top = self.data[self.top - 1];
+        if (top != .Top) {
+            std.debug.print("Expected Top value on operand stack but got {any}\n", .{top});
+            return error.TypeMismatch;
+        }
+
+        self.top -= 2;
+
+        const val = self.data[self.top];
+        return switch (val) {
+            .Long => |l| l,
+            else => error.TypeMismatch,
+        };
+    }
+
+    pub fn pushDouble(self: *OperandStack, v: f64) !void {
+        if (self.top + 1 >= self.data.len)
+            return error.StackOverflow;
+
+        self.data[self.top] = Value{ .Double = v };
+        self.data[self.top + 1] = Value.Top;
+        self.top += 2;
+    }
+
+    pub fn popDouble(self: *OperandStack) !f64 {
+        if (self.top == 0)
+            return error.StackUnderflow;
+
+        const top = self.data[self.top - 1];
+        if (top != .Top) {
+            std.debug.print("Expected Top value on operand stack but got {any}\n", .{top});
+            return error.TypeMismatch;
+        }
+
+        self.top -= 2;
+
+        const val = self.data[self.top];
+        return switch (val) {
+            .Double => |d| d,
+            else => error.TypeMismatch,
+        };
+    }
 };

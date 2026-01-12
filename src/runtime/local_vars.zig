@@ -6,9 +6,9 @@ pub const LocalVars = struct {
 
     pub fn init(allocator: *const std.mem.Allocator, count: usize) !LocalVars {
         const vars = try allocator.alloc(Value, count);
-        // Inizializza tutte le variabili a Int: 0
+        // Inizializza tutte le variabili a Top
         for (vars) |*v| {
-            v.* = Value{ .Int = 0 };
+            v.* = Value{ .Top = {} };
         }
         return LocalVars{
             .vars = vars,

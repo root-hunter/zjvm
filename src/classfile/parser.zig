@@ -16,7 +16,7 @@ pub const ClassInfo = struct {
     minor_version: types.U2,
     major_version: types.U2,
     constant_pool_count: types.U2,
-    constant_pool: ?[]cp.ConstantPoolInfo,
+    constant_pool: ?[]cp.ConstantPoolEntry,
 
     access_flags: types.U2,
 
@@ -84,11 +84,11 @@ pub const ClassInfo = struct {
 
     pub fn parseConstantPool(self: *ClassInfo, cursor: *utils.Cursor) !void {
         const pool_size: usize = @intCast(self.constant_pool_count - 1);
-        self.constant_pool = try self.allocator.alloc(cp.ConstantPoolInfo, pool_size);
+        self.constant_pool = try self.allocator.alloc(cp.ConstantPoolEntry, pool_size);
 
         var i: usize = 0;
         while (i < pool_size) {
-            const entry = try cp.ConstantPoolInfo.parse(cursor);
+            const entry = try cp.ConstantPoolEntry.parse(cursor);
             self.constant_pool.?[i] = entry;
 
             switch (entry) {
@@ -182,6 +182,19 @@ pub const ClassInfo = struct {
         } else {
             return error.ConstantPoolNotInitialized;
         }
+    }
+
+    pub fn getCpEntry(
+        self: *const ClassInfo,
+        index: u16,
+    ) !cp.ConstantPoolEntry {
+        if (self.constant_pool == null)
+            return error.ConstantPoolNotInitialized;
+
+        if (index == 0 or index > self.constant_pool.?.len)
+            return error.InvalidConstantPoolIndex;
+
+        return self.constant_pool.?[@intCast(index - 1)];
     }
 
     pub fn getMethodName(self: *const ClassInfo, method: MethodInfo) ![]const u8 {
