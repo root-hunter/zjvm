@@ -152,6 +152,27 @@ test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
     try makeTestSuite(filePath, &expectedValues);
 }
 
+test "ZJVM Test Suite 9 Double Arithmetic" {
+    const expectedValues = [_]v.Value{
+        .{ .Top = {} },
+        .{ .Double = 5 },
+        .{ .Top = {} },
+        .{ .Double = 5.5 },
+        .{ .Top = {} },
+        .{ .Int = 10 },
+        .{ .Double = 10.5 },
+        .{ .Top = {} },
+        .{ .Double = 10 },
+        .{ .Top = {} },
+        .{ .Double = 20 },
+        .{ .Top = {} },
+        .{ .Double = 5 },
+        .{ .Top = {} },
+    };
+    const filePath = "samples/TestSuite9.class";
+    try makeTestSuite(filePath, &expectedValues);
+}
+
 // Import all test files to include them in the test suite
 test {
     _ = @import("runtime/value_test.zig");
