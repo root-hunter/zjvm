@@ -22,22 +22,22 @@ test:
 	zig build test
 	@echo "All tests passed!"
 
-clean-zjvm:
+clean:
 	@echo "Cleaning ZJVM build artifacts..."
-	zig clean
+	zig build uninstall
 	@echo "ZJVM clean complete."
 
-run: build-zjvm
+run: build
 	@echo "Running ZJVM..."
 	./zig-out/bin/zjvm $(ARGS)
 	@echo "Finished"
 
-run-release: build-zjvm-release
+run-release: build-release
 	@echo "Running ZJVM in release mode..."
 	./zig-out/bin/zjvm $(ARGS)
 	@echo "Finished"
 
-publish-release: build-zjvm test
+publish-release: build-release test
 	@echo "Pushing ZJVM to remote repository..."
 	git add .
 	git tag -a "v$(RELEASE_VERSION)" -m "Release version v$(RELEASE_VERSION)"
@@ -47,3 +47,5 @@ publish-release: build-zjvm test
 
 print-version:
 	@echo "ZJVM Version: $(RELEASE_VERSION)"
+
+.PHONY: build-samples build build-release test clean run run-release publish-release print-version
