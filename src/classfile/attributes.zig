@@ -17,7 +17,7 @@ pub const AttributesInfo = struct {
         const attributeLength = try cursor.readU4();
         const info = try cursor.readBytes(@intCast(attributeLength));
 
-        const name = try class.getConstant(attributeNameIndex);
+        const name = try class.getConstantUtf8(attributeNameIndex);
 
         return AttributesInfo{
             .attribute_name_index = attributeNameIndex,

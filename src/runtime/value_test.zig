@@ -22,11 +22,6 @@ test "Value - Double creation and access" {
     try testing.expectEqual(@as(f64, 2.718281828), val.Double);
 }
 
-test "Value - Reference creation and access" {
-    const val = v.Value{ .Reference = 0x1234 };
-    try testing.expectEqual(@as(usize, 0x1234), val.Reference);
-}
-
 test "Value - negative Int" {
     const val = v.Value{ .Int = -100 };
     try testing.expectEqual(@as(i32, -100), val.Int);

@@ -11,6 +11,7 @@ pub const OpcodeEnum = enum(u8) {
     IConst5 = 0x08,
     BiPush = 0x10,
     SiPush = 0x11,
+    LDC = 0x12,
     LDC2_W = 0x14,
     ILoad = 0x15,
     DLoad = 0x18,
@@ -49,6 +50,8 @@ pub const OpcodeEnum = enum(u8) {
     IReturn = 0xac,
     InvokeStatic = 0xb8,
     Return = 0xb1,
+    GetStatic = 0xb2,
+    InvokeVirtual = 0xb6,
 
     pub fn getOperandFormat(self: OpcodeEnum) OperandFormat {
         return switch (self) {
@@ -61,6 +64,7 @@ pub const OpcodeEnum = enum(u8) {
         return switch (self) {
             OpcodeEnum.BiPush => 2, // 1 byte operand
             OpcodeEnum.SiPush => 3, // 2 byte operand
+            OpcodeEnum.LDC => 2, // 1 byte operand
             OpcodeEnum.LDC2_W => 3, // 2 byte operand
             OpcodeEnum.IStore => 2, // istore <index>
             OpcodeEnum.ILoad => 2, // iload <index>
@@ -73,6 +77,8 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.IfCmpLe => 3, // if_icmple <branchbyte1> <branchbyte2>
             OpcodeEnum.GoTo => 3, // goto <branchbyte1> <branchbyte2>
             OpcodeEnum.InvokeStatic => 3, // invokestatic <indexbyte1> <indexbyte2>
+            OpcodeEnum.GetStatic => 3, // getstatic <indexbyte1> <indexbyte2>
+            OpcodeEnum.InvokeVirtual => 3, // invokevirtual <indexbyte1> <indexbyte2>
             else => 1, // nessun operand
         };
     }
@@ -91,6 +97,7 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.IConst5 => "iconst_5",
             OpcodeEnum.BiPush => "bipush",
             OpcodeEnum.SiPush => "sipush",
+            OpcodeEnum.LDC => "ldc",
             OpcodeEnum.LDC2_W => "ldc2_w",
             OpcodeEnum.ILoad => "iload",
             OpcodeEnum.ILoad0 => "iload_0",
@@ -129,6 +136,8 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.GoTo => "goto",
             OpcodeEnum.IReturn => "ireturn",
             OpcodeEnum.Return => "return",
+            OpcodeEnum.GetStatic => "getstatic",
+            OpcodeEnum.InvokeVirtual => "invokevirtual",
         };
     }
 };

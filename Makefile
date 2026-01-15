@@ -24,7 +24,7 @@ test:
 
 clean:
 	@echo "Cleaning ZJVM build artifacts..."
-	zig build uninstall
+	rm -rf zig-out
 	@echo "ZJVM clean complete."
 
 run: build

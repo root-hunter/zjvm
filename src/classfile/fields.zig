@@ -34,8 +34,8 @@ pub const FieldInfo = struct {
         self.descriptor_index = try cursor.readU2();
         self.attributes_count = try cursor.readU2();
 
-        self.name = try class.getConstant(self.name_index);
-        self.descriptor = try class.getConstant(self.descriptor_index);
+        self.name = try class.getConstantUtf8(self.name_index);
+        self.descriptor = try class.getConstantUtf8(self.descriptor_index);
 
         const count: usize = @intCast(self.attributes_count);
         self.attributes = try a.AttributesInfo.parseAll(self.allocator, cursor, count, class);

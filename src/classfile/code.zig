@@ -5,6 +5,11 @@ const AttributesInfo = @import("attributes.zig").AttributesInfo;
 const p = @import("parser.zig");
 const o = @import("../engine/opcode.zig");
 
+pub const StdFunction = enum(u8) {
+    Println = 1,
+    Print = 2,
+};
+
 pub const ExceptionTableEntry = struct {
     start_pc: types.U2,
     end_pc: types.U2,
@@ -19,6 +24,8 @@ pub const CodeAttribute = struct {
 
     exception_table: []ExceptionTableEntry,
     attributes: []AttributesInfo,
+
+    std_function: ?StdFunction = null,
 
     pub fn parse(
         allocator: *const std.mem.Allocator,

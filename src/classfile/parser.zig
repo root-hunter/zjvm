@@ -9,6 +9,11 @@ const FieldInfo = @import("fields.zig").FieldInfo;
 const MethodInfo = @import("methods.zig").MethodInfo;
 const CodeAttribute = @import("code.zig").CodeAttribute;
 
+pub const FieldRefInfo = struct {
+    class_index: types.U2,
+    name_and_type_index: types.U2,
+};
+
 pub const ClassInfo = struct {
     allocator: *const std.mem.Allocator,
 
@@ -147,41 +152,77 @@ pub const ClassInfo = struct {
 
     pub fn getFieldName(self: *ClassInfo, field: FieldInfo) ![]const u8 {
         const name_index = field.name_index;
-        return self.getConstant(name_index);
+        return self.getConstantUtf8(name_index);
     }
 
-    pub fn getConstant(self: *const ClassInfo, index: types.U2) ![]const u8 {
+    pub fn getFieldRef(self: *const ClassInfo, index: types.U2) !FieldRefInfo {
         if (self.constant_pool) |constantPool| {
             const cp_entry = constantPool[@intCast(index - 1)];
+
             return switch (cp_entry) {
-                .Utf8 => |str| str,
-                .Methodref => |methodref| {
-                    const name_and_type_cp = constantPool[@intCast(methodref.name_and_type_index - 1)];
-                    return switch (name_and_type_cp) {
-                        .NameAndType => |name_and_type| {
-                            const name_cp = constantPool[@intCast(name_and_type.name_index - 1)];
-                            return switch (name_cp) {
-                                .Utf8 => |name_str| name_str,
-                                else => {
-                                    std.debug.print("Error: NameAndType entry at index {d} does not point to a Utf8 entry for name. Found: {s}\n", .{ name_and_type.name_index, @tagName(name_cp) });
-                                    return error.InvalidConstantPoolEntry;
-                                },
-                            };
-                        },
-                        else => {
-                            std.debug.print("Error: Methodref entry at index {d} does not point to a NameAndType entry. Found: {s}\n", .{ methodref.name_and_type_index, @tagName(name_and_type_cp) });
-                            return error.InvalidConstantPoolEntry;
-                        },
+                .Fieldref => |fieldref| {
+                    return FieldRefInfo{
+                        .class_index = fieldref.class_index,
+                        .name_and_type_index = fieldref.name_and_type_index,
                     };
                 },
                 else => {
-                    std.debug.print("Error: Constant pool entry at index {d} is not a Utf8 entry. Found: {s}\n", .{ index, @tagName(cp_entry) });
+                    std.debug.print("Error: Constant pool entry at index {d} is not a FieldRef entry. Found: {s}\n", .{ index, @tagName(cp_entry) });
                     return error.InvalidConstantPoolEntry;
                 },
             };
         } else {
             return error.ConstantPoolNotInitialized;
         }
+    }
+
+    pub fn getConstant(self: *const ClassInfo, index: types.U2) !cp.ConstantPoolEntry {
+        if (self.constant_pool) |constantPool| {
+            const cp_entry = constantPool[@intCast(index - 1)];
+            return cp_entry;
+        } else {
+            return error.ConstantPoolNotInitialized;
+        }
+    }
+
+    pub fn getConstantUtf8(self: *const ClassInfo, index: types.U2) ![]const u8 {
+        const cp_entry = try self.getConstant(index);
+        return switch (cp_entry) {
+            .Utf8 => |str| str,
+            .Class => |name_index| {
+                const name_cp = try self.getConstant(name_index);
+                return switch (name_cp) {
+                    .Utf8 => |name_str| name_str,
+                    else => {
+                        std.debug.print("Error: Class entry at index {d} does not point to a Utf8 entry for name. Found: {s}\n", .{ name_index, @tagName(name_cp) });
+                        return error.InvalidConstantPoolEntry;
+                    },
+                };
+            },
+            .Methodref => |methodref| {
+                const name_and_type_cp = try self.getConstant(methodref.name_and_type_index);
+                return switch (name_and_type_cp) {
+                    .NameAndType => |name_and_type| {
+                        const name_cp = try self.getConstant(name_and_type.name_index);
+                        return switch (name_cp) {
+                            .Utf8 => |name_str| name_str,
+                            else => {
+                                std.debug.print("Error: NameAndType entry at index {d} does not point to a Utf8 entry for name. Found: {s}\n", .{ name_and_type.name_index, @tagName(name_cp) });
+                                return error.InvalidConstantPoolEntry;
+                            },
+                        };
+                    },
+                    else => {
+                        std.debug.print("Error: Methodref entry at index {d} does not point to a NameAndType entry. Found: {s}\n", .{ methodref.name_and_type_index, @tagName(name_and_type_cp) });
+                        return error.InvalidConstantPoolEntry;
+                    },
+                };
+            },
+            else => {
+                std.debug.print("Error: Constant pool entry at index {d} is not a Utf8 entry. Found: {s}\n", .{ index, @tagName(cp_entry) });
+                return error.InvalidConstantPoolEntry;
+            },
+        };
     }
 
     pub fn getCpEntry(
@@ -199,13 +240,13 @@ pub const ClassInfo = struct {
 
     pub fn getMethodName(self: *const ClassInfo, method: MethodInfo) ![]const u8 {
         const name_index = method.name_index;
-        return self.getConstant(name_index);
+        return self.getConstantUtf8(name_index);
     }
 
     fn setClassName(self: *const ClassInfo) ![]const u8 {
         const class_cp = self.constant_pool.?[@intCast(self.this_class - 1)];
         return switch (class_cp) {
-            .Class => |name_index| self.getConstant(name_index),
+            .Class => |name_index| self.getConstantUtf8(name_index),
             else => error.InvalidClassInfo,
         };
     }
@@ -213,7 +254,7 @@ pub const ClassInfo = struct {
     fn setSuperClassName(self: *ClassInfo) ![]const u8 {
         const super_cp = self.constant_pool.?[@intCast(self.super_class - 1)];
         return switch (super_cp) {
-            .Class => |name_index| self.getConstant(name_index),
+            .Class => |name_index| self.getConstantUtf8(name_index),
             else => error.InvalidClassInfo,
         };
     }
@@ -252,7 +293,7 @@ pub const ClassInfo = struct {
     pub fn getMethod(self: *const ClassInfo, name: []const u8) !?MethodInfo {
         if (self.methods) |methods| {
             for (methods) |method| {
-                const method_name = try self.getConstant(method.name_index);
+                const method_name = try self.getConstantUtf8(method.name_index);
                 if (std.mem.eql(u8, method_name, name)) {
                     return method;
                 }

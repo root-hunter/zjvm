@@ -3,6 +3,10 @@ const Frame = @import("../runtime/frame.zig").Frame;
 const Value = @import("../runtime/value.zig").Value;
 const OpcodeEnum = @import("opcode.zig").OpcodeEnum;
 const ZJVM = @import("../engine/vm.zig").ZJVM;
+const Code = @import("../classfile/code.zig").CodeAttribute;
+const StdFunction = @import("../classfile/code.zig").StdFunction;
+const AttributesInfo = @import("../classfile/attributes.zig").AttributesInfo;
+const ExceptionTableEntry = @import("../classfile/code.zig").ExceptionTableEntry;
 
 pub const JVMInterpreter = struct {
     pub fn execute(allocator: *const std.mem.Allocator, vm: *ZJVM) !void {
@@ -71,6 +75,29 @@ pub const JVMInterpreter = struct {
                     const value: i32 = @intCast(combined);
 
                     try frame.operand_stack.push(Value{ .Int = value });
+                },
+                OpcodeEnum.LDC => {
+                    const index_byte = frame.code[frame.pc + 1];
+                    const index: u16 = @as(u16, index_byte);
+
+                    const entry = try frame.class.getCpEntry(index);
+
+                    switch (entry) {
+                        .Integer => |int_value| {
+                            try frame.operand_stack.push(Value{ .Int = int_value });
+                        },
+                        .Float => |float_value| {
+                            try frame.operand_stack.push(Value{ .Float = float_value });
+                        },
+                        .String => |string_value| {
+                            // For now, we will push the reference as a usize pointer
+                            const str_ptr = @intFromPtr(&string_value);
+                            try frame.operand_stack.push(Value{ .Reference = str_ptr });
+                        },
+                        else => {
+                            return error.InvalidConstantType;
+                        },
+                    }
                 },
                 OpcodeEnum.LDC2_W => {
                     const index_high = @as(u16, frame.code[frame.pc + 1]);
@@ -337,7 +364,7 @@ pub const JVMInterpreter = struct {
                     const method_index: u16 =
                         (@as(u16, index_high) << 8) | @as(u16, index_low);
 
-                    const method_name = try frame.class.getConstant(method_index);
+                    const method_name = try frame.class.getConstantUtf8(method_index);
                     const method = try frame.class.getMethod(method_name) orelse return error.MethodNotFound;
 
                     const codeAttr = method.code orelse return error.NoCodeAttribute;
@@ -382,6 +409,103 @@ pub const JVMInterpreter = struct {
                 OpcodeEnum.Return => { // return
                     _ = try vm.stack.pop();
                     return;
+                },
+                OpcodeEnum.GetStatic => { // getstatic
+                    const indexbyte1 = frame.code[frame.pc + 1];
+                    const indexbyte2 = frame.code[frame.pc + 2];
+
+                    const index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
+
+                    const fieldref = try frame.class.getFieldRef(index);
+
+                    const name_and_type_cp = try frame.class.getConstant(fieldref.name_and_type_index);
+
+                    std.debug.print("Field class index: {}\n", .{fieldref.class_index});
+
+                    const class = try frame.class.getConstantUtf8(fieldref.class_index);
+
+                    std.debug.print("Field class: {any}\n", .{class});
+
+                    switch (name_and_type_cp) {
+                        .NameAndType => |name_and_type| {
+                            const name_cp = try frame.class.getConstant(name_and_type.name_index);
+                            switch (name_cp) {
+                                .Utf8 => |name_str| {
+                                    std.debug.print("Getting static field name: {s}\n", .{name_str});
+
+                                    // For now, we only support getting static fields from java/lang/System
+                                    if (std.mem.eql(u8, class, "java/lang/System")) {
+                                        if (std.mem.eql(u8, name_str, "out")) {
+                                            // Push System.out onto the operand stack
+                                            std.debug.print("Pushing System.out PrintStream reference onto operand stack\n", .{});
+                                            try frame.operand_stack.push(Value{ .Reference = 0xDEADBEEF }); // Placeholder for System.out
+
+                                        } else {
+                                            std.debug.print("Error: Unsupported static field name {s} in class {any}\n", .{ name_str, class });
+                                            return error.FieldNotFound;
+                                        }
+                                    } else {
+                                        std.debug.print("Error: Unsupported class {any} for getstatic\n", .{class});
+                                        return error.ClassNotFound;
+                                    }
+                                },
+                                else => {
+                                    std.debug.print("Error: NameAndType entry at index {d} does not point to a Utf8 entry for name. Found: {s}\n", .{ name_and_type.name_index, @tagName(name_cp) });
+                                    return error.InvalidConstantPoolEntry;
+                                },
+                            }
+                        },
+                        else => {
+                            std.debug.print("Error: FieldRef entry at index {d} does not point to a NameAndType entry. Found: {s}\n", .{ fieldref.name_and_type_index, @tagName(name_and_type_cp) });
+                            return error.InvalidConstantPoolEntry;
+                        },
+                    }
+
+                    std.debug.print("Getting static field:\n", .{});
+                    std.debug.print("Class: {s}\n", .{class});
+
+                    std.debug.print("FieldRef: {any}\n", .{fieldref});
+                    std.debug.print("Index: {}\n", .{index});
+                },
+                OpcodeEnum.InvokeVirtual => { // invokevirtual
+                    const indexbyte1 = frame.code[frame.pc + 1];
+                    const indexbyte2 = frame.code[frame.pc + 2];
+
+                    const method_index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
+
+                    const method_name = try frame.class.getConstantUtf8(method_index);
+
+                    std.debug.print("Invoking virtual method: {s}\n", .{method_name});
+
+                    const method = try frame.class.getMethod(method_name) orelse return error.MethodNotFound;
+
+                    const codeAttr = Code{
+                        .std_function = StdFunction.Println,
+                        .attributes = &[_]AttributesInfo{},
+                        .exception_table = &[_]ExceptionTableEntry{},
+                        .max_stack = 2,
+                        .max_locals = 2,
+                        .code = &[_]u8{},
+                    };
+
+                    frame.pc += opcode.getOperandLength();
+
+                    var new_frame = try Frame.init(allocator, codeAttr, frame.class);
+
+                    for (0..method.num_params) |i| {
+                        const arg = try frame.operand_stack.pop();
+                        new_frame.local_vars.vars[method.num_params - 1 - i] = arg;
+                    }
+
+                    // Pop the object reference
+                    const obj_ref = try frame.operand_stack.pop();
+
+                    _ = obj_ref;
+
+                    // For now, we are not using obj_ref, but in a full implementation, we would need to handle it.
+
+                    try vm.pushFrame(new_frame);
+                    continue;
                 },
             }
 
