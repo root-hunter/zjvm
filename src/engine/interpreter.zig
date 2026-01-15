@@ -8,10 +8,47 @@ const StdFunction = @import("../classfile/code.zig").StdFunction;
 const AttributesInfo = @import("../classfile/attributes.zig").AttributesInfo;
 const ExceptionTableEntry = @import("../classfile/code.zig").ExceptionTableEntry;
 
+const PrintStream = struct {};
+
+pub const JavaString = struct {
+    bytes: []const u8,
+};
+
 pub const JVMInterpreter = struct {
     pub fn execute(allocator: *const std.mem.Allocator, vm: *ZJVM) !void {
         while (true) {
             const frame = vm.currentFrame() orelse return error.NoFrame;
+
+            if (frame.codeAttr.std_function != null) {
+                const std_func = frame.codeAttr.std_function.?;
+                std.debug.print("Executing standard function: {s}\n", .{std_func.toString()});
+                switch (std_func) {
+                    .Println => {
+                        const value = frame.local_vars.vars[0];
+                        switch (value) {
+                            .Int => |i| {
+                                std.debug.print("{d}\n", .{i});
+                            },
+                            .Float => |f| {
+                                std.debug.print("{d}\n", .{f});
+                            },
+                            .Reference => |r| {
+                                const js: *JavaString = @ptrFromInt(r);
+                                std.debug.print("{s}\n", .{js.bytes});
+                            },
+                            else => {
+                                std.debug.print("Unsupported type for println\n", .{});
+                            },
+                        }
+                    },
+                    else => {
+                        return error.UnsupportedStdFunction;
+                    },
+                }
+                _ = try vm.popFrame();
+                if (vm.stack.top == 0) break;
+                continue;
+            }
 
             if (frame.pc >= frame.getCodeLength()) {
                 _ = try vm.popFrame();
@@ -88,10 +125,17 @@ pub const JVMInterpreter = struct {
                         .Float => |float_value| {
                             try frame.operand_stack.push(Value{ .Float = float_value });
                         },
-                        .String => |string_value| {
+                        .String => |string_index| {
                             // For now, we will push the reference as a usize pointer
-                            const str_ptr = @intFromPtr(&string_value);
-                            try frame.operand_stack.push(Value{ .Reference = str_ptr });
+
+                            const java_string = try allocator.create(JavaString);
+                            const str_bytes = try frame.class.getConstantUtf8(string_index);
+
+                            java_string.* = JavaString{
+                                .bytes = str_bytes,
+                            };
+
+                            try frame.operand_stack.push(Value{ .Reference = @intFromPtr(java_string) });
                         },
                         else => {
                             return error.InvalidConstantType;
@@ -435,10 +479,8 @@ pub const JVMInterpreter = struct {
                                     // For now, we only support getting static fields from java/lang/System
                                     if (std.mem.eql(u8, class, "java/lang/System")) {
                                         if (std.mem.eql(u8, name_str, "out")) {
-                                            // Push System.out onto the operand stack
-                                            std.debug.print("Pushing System.out PrintStream reference onto operand stack\n", .{});
-                                            try frame.operand_stack.push(Value{ .Reference = 0xDEADBEEF }); // Placeholder for System.out
-
+                                            const ps = try allocator.create(PrintStream);
+                                            try frame.operand_stack.push(Value{ .Reference = @intFromPtr(ps) });
                                         } else {
                                             std.debug.print("Error: Unsupported static field name {s} in class {any}\n", .{ name_str, class });
                                             return error.FieldNotFound;
@@ -476,14 +518,13 @@ pub const JVMInterpreter = struct {
 
                     std.debug.print("Invoking virtual method: {s}\n", .{method_name});
 
-                    const method = try frame.class.getMethod(method_name) orelse return error.MethodNotFound;
-
+                    const num_params: usize = 2; // For Println, we have one parameter
                     const codeAttr = Code{
                         .std_function = StdFunction.Println,
                         .attributes = &[_]AttributesInfo{},
                         .exception_table = &[_]ExceptionTableEntry{},
                         .max_stack = 2,
-                        .max_locals = 2,
+                        .max_locals = num_params,
                         .code = &[_]u8{},
                     };
 
@@ -491,15 +532,12 @@ pub const JVMInterpreter = struct {
 
                     var new_frame = try Frame.init(allocator, codeAttr, frame.class);
 
-                    for (0..method.num_params) |i| {
-                        const arg = try frame.operand_stack.pop();
-                        new_frame.local_vars.vars[method.num_params - 1 - i] = arg;
-                    }
+                    const arg = try frame.operand_stack.pop(); // String
+                    const this_ref = try frame.operand_stack.pop(); // PrintStream
 
-                    // Pop the object reference
-                    const obj_ref = try frame.operand_stack.pop();
-
-                    _ = obj_ref;
+                    new_frame.local_vars.vars[0] = arg;
+                    // this_ref lo puoi ignorare ORA, ma DEVI consumarlo
+                    new_frame.local_vars.vars[1] = this_ref;
 
                     // For now, we are not using obj_ref, but in a full implementation, we would need to handle it.
 

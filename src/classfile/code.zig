@@ -8,6 +8,13 @@ const o = @import("../engine/opcode.zig");
 pub const StdFunction = enum(u8) {
     Println = 1,
     Print = 2,
+
+    pub fn toString(self: StdFunction) []const u8 {
+        return switch (self) {
+            .Println => "StdFunction.println",
+            .Print => "StdFunction.print",
+        };
+    }
 };
 
 pub const ExceptionTableEntry = struct {
