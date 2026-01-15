@@ -7,12 +7,12 @@ build-samples:
 	javac samples/*.java
 	@echo "Sample Java class files build complete."
 
-build-zjvm:
+build:
 	@echo "Building ZJVM..."
 	zig build
 	@echo "ZJVM build complete."
 
-build-zjvm-release:
+build-release:
 	@echo "Building ZJVM in release mode..."
 	zig build --release=$(RELEASE_MODE)
 	@echo "ZJVM release build complete."
