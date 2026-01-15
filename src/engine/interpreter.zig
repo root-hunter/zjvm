@@ -21,7 +21,6 @@ pub const JVMInterpreter = struct {
 
             if (frame.codeAttr.std_function != null) {
                 const std_func = frame.codeAttr.std_function.?;
-                std.debug.print("Executing standard function: {s}\n", .{std_func.toString()});
                 switch (std_func) {
                     .Println => {
                         const value = frame.local_vars.vars[0];
@@ -462,20 +461,13 @@ pub const JVMInterpreter = struct {
                     const fieldref = try frame.class.getFieldRef(index);
 
                     const name_and_type_cp = try frame.class.getConstant(fieldref.name_and_type_index);
-
-                    std.debug.print("Field class index: {}\n", .{fieldref.class_index});
-
                     const class = try frame.class.getConstantUtf8(fieldref.class_index);
-
-                    std.debug.print("Field class: {any}\n", .{class});
 
                     switch (name_and_type_cp) {
                         .NameAndType => |name_and_type| {
                             const name_cp = try frame.class.getConstant(name_and_type.name_index);
                             switch (name_cp) {
                                 .Utf8 => |name_str| {
-                                    std.debug.print("Getting static field name: {s}\n", .{name_str});
-
                                     // For now, we only support getting static fields from java/lang/System
                                     if (std.mem.eql(u8, class, "java/lang/System")) {
                                         if (std.mem.eql(u8, name_str, "out")) {
@@ -501,12 +493,6 @@ pub const JVMInterpreter = struct {
                             return error.InvalidConstantPoolEntry;
                         },
                     }
-
-                    std.debug.print("Getting static field:\n", .{});
-                    std.debug.print("Class: {s}\n", .{class});
-
-                    std.debug.print("FieldRef: {any}\n", .{fieldref});
-                    std.debug.print("Index: {}\n", .{index});
                 },
                 OpcodeEnum.InvokeVirtual => { // invokevirtual
                     const indexbyte1 = frame.getCodeByte(frame.pc + 1);
@@ -515,8 +501,12 @@ pub const JVMInterpreter = struct {
                     const method_index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
 
                     const method_name = try frame.class.getConstantUtf8(method_index);
+                    // std.debug.print("Invoking virtual method: {s}\n", .{method_name});
 
-                    std.debug.print("Invoking virtual method: {s}\n", .{method_name});
+                    if (!std.mem.eql(u8, method_name, "println")) {
+                        std.debug.print("Error: Unsupported virtual method {s}\n", .{method_name});
+                        return error.MethodNotFound;
+                    }
 
                     const num_params: usize = 2; // For Println, we have one parameter
                     const codeAttr = Code{
