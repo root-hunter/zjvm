@@ -8,7 +8,7 @@ const p = @import("../classfile/parser.zig");
 pub const Frame = struct {
     operand_stack: OperandStack,
     local_vars: LocalVars,
-    code: []const u8,
+    codeAttr: ca.CodeAttribute,
     pc: usize,
 
     // ZJVM adds
@@ -22,17 +22,25 @@ pub const Frame = struct {
         return Frame{
             .operand_stack = try OperandStack.init(allocator, codeAttr.max_stack),
             .local_vars = try LocalVars.init(allocator, codeAttr.max_locals),
-            .code = codeAttr.code,
+            .codeAttr = codeAttr,
             .pc = 0,
             .class = class,
         };
+    }
+
+    pub fn getCodeLength(self: *const Frame) usize {
+        return self.codeAttr.getCodeLength();
+    }
+
+    pub fn getCodeByte(self: *const Frame, index: usize) u8 {
+        return self.codeAttr.getByte(index);
     }
 
     /// Dump function to print all local variables in the frame
     pub fn dump(self: *const Frame) void {
         std.debug.print("\n=== Frame Dump ===\n", .{});
         std.debug.print("PC: {d}\n", .{self.pc});
-        std.debug.print("Code Length: {d}\n", .{self.code.len});
+        std.debug.print("Code Length: {d}\n", .{self.getCodeLength()});
         std.debug.print("\nLocal Variables ({d}):\n", .{self.local_vars.vars.len});
 
         for (self.local_vars.vars, 0..) |val, i| {

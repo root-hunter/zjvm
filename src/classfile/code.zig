@@ -27,6 +27,14 @@ pub const CodeAttribute = struct {
 
     std_function: ?StdFunction = null,
 
+    pub fn getCodeLength(self: *const CodeAttribute) usize {
+        return self.code.len;
+    }
+
+    pub fn getByte(self: *const CodeAttribute, index: usize) u8 {
+        return self.code[index];
+    }
+
     pub fn parse(
         allocator: *const std.mem.Allocator,
         cursor: *Cursor,

@@ -13,21 +13,20 @@ pub const JVMInterpreter = struct {
         while (true) {
             const frame = vm.currentFrame() orelse return error.NoFrame;
 
-            if (frame.pc >= frame.code.len) {
+            if (frame.pc >= frame.getCodeLength()) {
                 _ = try vm.popFrame();
                 if (vm.stack.top == 0) break;
                 continue;
             }
 
-            const result = std.meta.intToEnum(OpcodeEnum, frame.code[frame.pc]);
+            const result = std.meta.intToEnum(OpcodeEnum, frame.getCodeByte(frame.pc));
 
             if (result == error.InvalidEnumTag) {
-                std.debug.print("Invalid opcode 0x{x} at pc {d}\n", .{ frame.code[frame.pc], frame.pc });
+                std.debug.print("Invalid opcode 0x{x} at pc {d}\n", .{ frame.getCodeByte(frame.pc), frame.pc });
                 return error.InvalidOpcode;
             }
 
-            const opcode: OpcodeEnum = @enumFromInt(frame.code[frame.pc]);
-
+            const opcode: OpcodeEnum = @enumFromInt(frame.getCodeByte(frame.pc));
             switch (opcode) {
                 OpcodeEnum.Nop => {
                     // Do nothing
@@ -60,13 +59,13 @@ pub const JVMInterpreter = struct {
                     try frame.operand_stack.push(Value{ .Int = 5 });
                 },
                 OpcodeEnum.BiPush => {
-                    const byte = frame.code[frame.pc + 1]; // il byte seguente
+                    const byte = frame.getCodeByte(frame.pc + 1); // il byte seguente
                     const value: i32 = @intCast(byte); // bipush è signed 8-bit
                     try frame.operand_stack.push(Value{ .Int = value });
                 },
                 OpcodeEnum.SiPush => {
-                    const high_byte = frame.code[frame.pc + 1];
-                    const low_byte = frame.code[frame.pc + 2];
+                    const high_byte = frame.getCodeByte(frame.pc + 1);
+                    const low_byte = frame.getCodeByte(frame.pc + 2);
 
                     const high: i16 = @intCast(high_byte);
                     const low: i16 = @intCast(low_byte);
@@ -77,7 +76,7 @@ pub const JVMInterpreter = struct {
                     try frame.operand_stack.push(Value{ .Int = value });
                 },
                 OpcodeEnum.LDC => {
-                    const index_byte = frame.code[frame.pc + 1];
+                    const index_byte = frame.getCodeByte(frame.pc + 1);
                     const index: u16 = @as(u16, index_byte);
 
                     const entry = try frame.class.getCpEntry(index);
@@ -100,8 +99,8 @@ pub const JVMInterpreter = struct {
                     }
                 },
                 OpcodeEnum.LDC2_W => {
-                    const index_high = @as(u16, frame.code[frame.pc + 1]);
-                    const index_low = @as(u16, frame.code[frame.pc + 2]);
+                    const index_high = @as(u16, frame.getCodeByte(frame.pc + 1));
+                    const index_low = @as(u16, frame.getCodeByte(frame.pc + 2));
 
                     const index: u16 = (index_high << 8) | index_low;
 
@@ -120,7 +119,7 @@ pub const JVMInterpreter = struct {
                     }
                 },
                 OpcodeEnum.ILoad => { // iload
-                    const index_byte = frame.code[frame.pc + 1];
+                    const index_byte = frame.getCodeByte(frame.pc + 1);
                     const index: usize = @intCast(index_byte);
                     const value = frame.local_vars.vars[index];
                     try frame.operand_stack.push(value);
@@ -146,7 +145,7 @@ pub const JVMInterpreter = struct {
                     try frame.operand_stack.push(value);
                 },
                 OpcodeEnum.DLoad => { // dload
-                    const index: usize = @intCast(frame.code[frame.pc + 1]);
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
                     const v = frame.local_vars.vars[index];
 
                     switch (v) {
@@ -181,7 +180,7 @@ pub const JVMInterpreter = struct {
                     try frame.operand_stack.push(element);
                 },
                 OpcodeEnum.IStore => { // istore
-                    const index_byte = frame.code[frame.pc + 1];
+                    const index_byte = frame.getCodeByte(frame.pc + 1);
                     const index: usize = @intCast(index_byte);
                     const value = try frame.operand_stack.pop();
                     frame.local_vars.vars[index] = value;
@@ -203,7 +202,7 @@ pub const JVMInterpreter = struct {
                     frame.local_vars.vars[3] = value;
                 },
                 OpcodeEnum.DStore => { // dstore
-                    const index: usize = @intCast(frame.code[frame.pc + 1]);
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
                     const v = try frame.operand_stack.popDouble();
 
                     frame.local_vars.vars[index] = Value{ .Double = v };
@@ -280,8 +279,8 @@ pub const JVMInterpreter = struct {
                     try frame.operand_stack.push(Value{ .Long = r });
                 },
                 OpcodeEnum.IInc => { // iinc
-                    const index_byte = frame.code[frame.pc + 1];
-                    const const_byte = frame.code[frame.pc + 2];
+                    const index_byte = frame.getCodeByte(frame.pc + 1);
+                    const const_byte = frame.getCodeByte(frame.pc + 2);
 
                     const index: usize = @intCast(index_byte);
                     const increment: i32 = @intCast(const_byte);
@@ -307,8 +306,8 @@ pub const JVMInterpreter = struct {
                     const value2 = try frame.operand_stack.pop();
                     const value1 = try frame.operand_stack.pop();
 
-                    const offset_high = frame.code[frame.pc + 1];
-                    const offset_low = frame.code[frame.pc + 2];
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
 
                     const high: i16 = @intCast(offset_high);
                     const low: i16 = @intCast(offset_low);
@@ -325,8 +324,8 @@ pub const JVMInterpreter = struct {
                     const value2 = try frame.operand_stack.pop();
                     const value1 = try frame.operand_stack.pop();
 
-                    const offset_high = frame.code[frame.pc + 1];
-                    const offset_low = frame.code[frame.pc + 2];
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
 
                     const high: i16 = @intCast(offset_high);
                     const low: i16 = @intCast(offset_low);
@@ -343,8 +342,8 @@ pub const JVMInterpreter = struct {
                     const value2 = try frame.operand_stack.pop();
                     const value1 = try frame.operand_stack.pop();
 
-                    const offset_high = frame.code[frame.pc + 1];
-                    const offset_low = frame.code[frame.pc + 2];
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
 
                     const high: i16 = @intCast(offset_high);
                     const low: i16 = @intCast(offset_low);
@@ -358,8 +357,8 @@ pub const JVMInterpreter = struct {
                     }
                 },
                 OpcodeEnum.InvokeStatic => {
-                    const index_high = frame.code[frame.pc + 1];
-                    const index_low = frame.code[frame.pc + 2];
+                    const index_high = frame.getCodeByte(frame.pc + 1);
+                    const index_low = frame.getCodeByte(frame.pc + 2);
 
                     const method_index: u16 =
                         (@as(u16, index_high) << 8) | @as(u16, index_low);
@@ -382,8 +381,8 @@ pub const JVMInterpreter = struct {
                     continue;
                 },
                 OpcodeEnum.GoTo => {
-                    const offset_high = frame.code[frame.pc + 1];
-                    const offset_low = frame.code[frame.pc + 2];
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
 
                     const branch_offset: i16 =
                         (@as(i16, offset_high) << 8) | @as(i16, offset_low);
@@ -411,8 +410,8 @@ pub const JVMInterpreter = struct {
                     return;
                 },
                 OpcodeEnum.GetStatic => { // getstatic
-                    const indexbyte1 = frame.code[frame.pc + 1];
-                    const indexbyte2 = frame.code[frame.pc + 2];
+                    const indexbyte1 = frame.getCodeByte(frame.pc + 1);
+                    const indexbyte2 = frame.getCodeByte(frame.pc + 2);
 
                     const index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
 
@@ -468,8 +467,8 @@ pub const JVMInterpreter = struct {
                     std.debug.print("Index: {}\n", .{index});
                 },
                 OpcodeEnum.InvokeVirtual => { // invokevirtual
-                    const indexbyte1 = frame.code[frame.pc + 1];
-                    const indexbyte2 = frame.code[frame.pc + 2];
+                    const indexbyte1 = frame.getCodeByte(frame.pc + 1);
+                    const indexbyte2 = frame.getCodeByte(frame.pc + 2);
 
                     const method_index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
 
