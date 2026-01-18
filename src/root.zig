@@ -9,7 +9,7 @@ const ZJVM = @import("engine/vm.zig").ZJVM;
 
 const testing = std.testing;
 
-fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
+fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !i.JVMInterpreter {
     var allocator = std.heap.page_allocator;
 
     var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
@@ -41,10 +41,13 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
             while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
                 try testing.expectEqual(expectedValues[index], frame.local_vars.get(index));
             }
+            return interpreter;
         } else {
-            // try testing.expect(false, "No code attribute found for method 'main'");
+            return error.NoCodeAttribute;
         }
     }
+
+    return error.MethodMainNotFound;
 }
 
 test "ZJVM Test Suite 1" {
@@ -59,7 +62,7 @@ test "ZJVM Test Suite 1" {
     };
     const filePath = "samples/TestSuite1.class";
 
-    try makeTestSuite(filePath, &expectedValues);
+    _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 2" {
@@ -71,7 +74,7 @@ test "ZJVM Test Suite 2" {
         .{ .Int = 80 },
     };
     const filePath = "samples/TestSuite2.class";
-    try makeTestSuite(filePath, &expectedValues);
+    _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 3" {
@@ -84,7 +87,7 @@ test "ZJVM Test Suite 3" {
         .{ .Int = 0 },
     };
     const filePath = "samples/TestSuite3.class";
-    try makeTestSuite(filePath, &expectedValues);
+    _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 4" {
@@ -99,7 +102,7 @@ test "ZJVM Test Suite 4" {
         .{ .Int = 24100 },
     };
     const filePath = "samples/TestSuite4.class";
-    try makeTestSuite(filePath, &expectedValues);
+    _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 5" {
@@ -110,7 +113,7 @@ test "ZJVM Test Suite 5" {
         .{ .Int = 20736 },
     };
     const filePath = "samples/TestSuite5.class";
-    try makeTestSuite(filePath, &expectedValues);
+    _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 6" {
@@ -122,7 +125,7 @@ test "ZJVM Test Suite 6" {
         .{ .Int = 5013 },
     };
     const filePath = "samples/TestSuite6.class";
-    try makeTestSuite(filePath, &expectedValues);
+    _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 7" {
@@ -134,7 +137,7 @@ test "ZJVM Test Suite 7" {
         .{ .Int = 41 },
     };
     const filePath = "samples/TestSuite7.class";
-    try makeTestSuite(filePath, &expectedValues);
+    _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
@@ -150,7 +153,7 @@ test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
         .{ .Int = 6765 },
     };
     const filePath = "samples/TestSuite8.class";
-    try makeTestSuite(filePath, &expectedValues);
+    _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 9 Double Arithmetic" {
@@ -171,7 +174,7 @@ test "ZJVM Test Suite 9 Double Arithmetic" {
         .{ .Top = {} },
     };
     const filePath = "samples/TestSuite9.class";
-    try makeTestSuite(filePath, &expectedValues);
+    _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 // Import all test files to include them in the test suite
