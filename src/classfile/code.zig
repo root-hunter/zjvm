@@ -4,17 +4,23 @@ const Cursor = @import("utils.zig").Cursor;
 const AttributesInfo = @import("attributes.zig").AttributesInfo;
 const p = @import("parser.zig");
 const o = @import("../engine/opcode.zig");
+const m = @import("methods.zig");
 
-pub const StdFunction = enum(u8) {
+pub const StdFunctionKind = enum(u8) {
     Println = 1,
     Print = 2,
 
-    pub fn toString(self: StdFunction) []const u8 {
+    pub fn toString(self: StdFunctionKind) []const u8 {
         return switch (self) {
             .Println => "StdFunction.println",
             .Print => "StdFunction.print",
         };
     }
+};
+
+pub const StdFunction = struct {
+    func: StdFunctionKind,
+    method: m.MethodInfo,
 };
 
 pub const ExceptionTableEntry = struct {
@@ -31,8 +37,6 @@ pub const CodeAttribute = struct {
 
     exception_table: []ExceptionTableEntry,
     attributes: []AttributesInfo,
-
-    std_function: ?StdFunction = null,
 
     pub fn getCodeLength(self: *const CodeAttribute) usize {
         return self.code.len;

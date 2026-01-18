@@ -96,3 +96,53 @@ pub fn countMethodParameters(descriptor: []const u8) !usize {
 
     return count;
 }
+
+
+pub fn getMethodParameterTypes(descriptor: []const u8) ![]types.Utf8Info {
+    const allocator = std.heap.page_allocator;
+    var types_list = try std.ArrayList(types.Utf8Info).initCapacity(allocator, try countMethodParameters(descriptor));
+
+    var i: usize = 0;
+
+    if (descriptor.len == 0 or descriptor[0] != '(') {
+        return error.InvalidMethodDescriptor;
+    }
+    i += 1; // Skip '('
+
+    while (i < descriptor.len) : (i += 1) {
+        if (descriptor[i] == ')') break;
+
+        const start = i;
+
+        switch (descriptor[i]) {
+            'B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z' => {
+                const type_desc = descriptor[start .. start + 1];
+                try types_list.append(allocator, types.Utf8Info{ .length = @intCast(type_desc.len), .bytes = type_desc });
+            },
+            'L' => {
+                i += 1;
+                while (i < descriptor.len and descriptor[i] != ';') : (i += 1) {}
+                if (i >= descriptor.len) return error.InvalidMethodDescriptor;
+
+                const type_desc = descriptor[start .. i + 1];
+                try types_list.append(allocator, types.Utf8Info{ .length = @intCast(type_desc.len), .bytes = type_desc });
+            },
+            '[' => {
+                i += 1;
+                while (i < descriptor.len and descriptor[i] == '[') : (i += 1) {}
+                if (i >= descriptor.len) return error.InvalidMethodDescriptor;
+                if (descriptor[i] == 'L') {
+                    i += 1;
+                    while (i < descriptor.len and descriptor[i] != ';') : (i += 1) {}
+                    if (i >= descriptor.len) return error.InvalidMethodDescriptor;
+                }
+
+                const type_desc = descriptor[start .. i + 1];
+                try types_list.append(allocator, types.Utf8Info{ .length = @intCast(type_desc.len), .bytes = type_desc });
+            },
+            else => return error.InvalidMethodDescriptor,
+        }
+    }
+
+    return types_list.toOwnedSlice(allocator);
+}

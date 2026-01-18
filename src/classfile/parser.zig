@@ -9,10 +9,13 @@ const FieldInfo = @import("fields.zig").FieldInfo;
 const MethodInfo = @import("methods.zig").MethodInfo;
 const CodeAttribute = @import("code.zig").CodeAttribute;
 
-pub const FieldRefInfo = struct {
+pub const RefInfo = struct {
     class_index: types.U2,
     name_and_type_index: types.U2,
 };
+
+pub const FieldRefInfo = RefInfo;
+pub const MethodRefInfo = RefInfo;
 
 pub const ClassInfo = struct {
     allocator: *const std.mem.Allocator,
@@ -176,6 +179,27 @@ pub const ClassInfo = struct {
         }
     }
 
+    pub fn getMethodRef(self: *const ClassInfo, index: types.U2) !MethodRefInfo {
+        if (self.constant_pool) |constantPool| {
+            const cp_entry = constantPool[@intCast(index - 1)];
+
+            return switch (cp_entry) {
+                .Methodref => |methodref| {
+                    return MethodRefInfo{
+                        .class_index = methodref.class_index,
+                        .name_and_type_index = methodref.name_and_type_index,
+                    };
+                },
+                else => {
+                    std.debug.print("Error: Constant pool entry at index {d} is not a MethodRef entry. Found: {s}\n", .{ index, @tagName(cp_entry) });
+                    return error.InvalidConstantPoolEntry;
+                },
+            };
+        } else {
+            return error.ConstantPoolNotInitialized;
+        }
+    }
+
     pub fn getConstant(self: *const ClassInfo, index: types.U2) !cp.ConstantPoolEntry {
         if (self.constant_pool) |constantPool| {
             const cp_entry = constantPool[@intCast(index - 1)];
@@ -300,6 +324,19 @@ pub const ClassInfo = struct {
             }
         }
         return null;
+    }
+
+    pub fn getMethodFromIndex(self: *const ClassInfo, index: types.U2) !?MethodInfo {
+        if (self.methods) |methods| {
+            const method_idx: usize = @intCast(index);
+            if (method_idx < methods.len) {
+                return methods[method_idx];
+            } else {
+                return null;
+            }
+        } else {
+            return null;
+        }
     }
 
     pub fn deinit(self: *ClassInfo) void {

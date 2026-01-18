@@ -8,7 +8,8 @@ const p = @import("../classfile/parser.zig");
 pub const Frame = struct {
     operand_stack: OperandStack,
     local_vars: LocalVars,
-    codeAttr: ca.CodeAttribute,
+    codeAttr: ?ca.CodeAttribute,
+    std_function: ?ca.StdFunction = null,
     pc: usize,
 
     // ZJVM adds
@@ -20,20 +21,37 @@ pub const Frame = struct {
         class: *const p.ClassInfo,
     ) !Frame {
         return Frame{
-            .operand_stack = try OperandStack.init(allocator, codeAttr.max_stack),
-            .local_vars = try LocalVars.init(allocator, codeAttr.max_locals),
+            .operand_stack = try OperandStack.init(allocator, codeAttr .max_stack),
+            .local_vars = try LocalVars.init(allocator, codeAttr .max_locals),
             .codeAttr = codeAttr,
             .pc = 0,
+            .std_function = null,
+            .class = class,
+        };
+    }
+
+    pub fn initStdFunctionFrame(
+        allocator: *const std.mem.Allocator,
+        std_function: ca.StdFunction,
+        num_locals: usize,
+        class: *const p.ClassInfo,
+    ) !Frame {
+        return Frame{
+            .operand_stack = try OperandStack.init(allocator, 10), // Arbitrary stack size for std functions
+            .local_vars = try LocalVars.init(allocator, num_locals),
+            .codeAttr = null,
+            .pc = 0,
+            .std_function = std_function,
             .class = class,
         };
     }
 
     pub fn getCodeLength(self: *const Frame) usize {
-        return self.codeAttr.getCodeLength();
+        return self.codeAttr.?.getCodeLength();
     }
 
     pub fn getCodeByte(self: *const Frame, index: usize) u8 {
-        return self.codeAttr.getByte(index);
+        return self.codeAttr.?.getByte(index);
     }
 
     /// Dump function to print all local variables in the frame

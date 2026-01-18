@@ -64,6 +64,39 @@ pub const MethodInfo = struct {
         return methods;
     }
 
+    pub fn fromRef(allocator: *const std.mem.Allocator, class: *const p.ClassInfo, method_ref: p.MethodRefInfo) !?MethodInfo {
+        const nat_cp = try class.getConstant(method_ref.name_and_type_index);
+        const nat = switch (nat_cp) {
+            .NameAndType => |v| v,
+            else => return error.InvalidConstantPoolEntry,
+        };
+
+        const name_cp = try class.getConstant(nat.name_index);
+        const method_name = switch (name_cp) {
+            .Utf8 => |s| s,
+            else => return error.InvalidConstantPoolEntry,
+        };
+
+        const descriptor_cp = try class.getConstant(nat.descriptor_index);
+        const method_descriptor = switch (descriptor_cp) {
+            .Utf8 => |s| s,
+            else => return error.InvalidConstantPoolEntry,
+        };
+
+        return MethodInfo{
+            .allocator = allocator,
+            .access_flags = 0,
+            .name_index = 0,
+            .descriptor_index = 0,
+            .attributes_count = 0,
+            .attributes = null,
+            .code = null,
+            .name = method_name,
+            .descriptor = method_descriptor,
+            .num_params = try utils.countMethodParameters(method_descriptor),
+        };
+    }
+
     pub fn parseCodeAttribute(
         self: *MethodInfo,
         class: *const p.ClassInfo,
@@ -103,5 +136,9 @@ pub const MethodInfo = struct {
             code.deinit();
             self.code = null;
         }
+    }
+
+    pub fn getParameterTypes(self: *const MethodInfo) ![]types.Utf8Info {
+        return try utils.getMethodParameterTypes(self.descriptor);
     }
 };
