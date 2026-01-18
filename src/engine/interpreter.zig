@@ -69,6 +69,9 @@ pub const JVMInterpreter = struct {
                             .Double => |d| {
                                 value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{d}) catch return error.OutOfMemory;
                             },
+                            .Long => |l| {
+                                value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{l}) catch return error.OutOfMemory;
+                            },
                             .Reference => |r| {
                                 const js: *JavaString = @ptrCast(@alignCast(r));
                                 value_str = js.bytes;
@@ -575,7 +578,7 @@ pub const JVMInterpreter = struct {
                                 .method = method.?,
                             };
 
-                            const is2Slots = std.mem.eql(u8, params[0].bytes, "D");
+                            const is2Slots = std.mem.eql(u8, params[0].bytes, "D") or std.mem.eql(u8, params[0].bytes, "J");
 
                             const num_params = method.?.num_params + 1;
 
