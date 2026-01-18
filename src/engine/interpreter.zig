@@ -8,50 +8,83 @@ const StdFunction = @import("../classfile/code.zig").StdFunction;
 const AttributesInfo = @import("../classfile/attributes.zig").AttributesInfo;
 const ExceptionTableEntry = @import("../classfile/code.zig").ExceptionTableEntry;
 
-const PrintStream = struct {};
+const PrintStream = struct {
+    stream: ?std.fs.File,
+};
 
 pub const JavaString = struct {
     bytes: []const u8,
 };
 
 pub const JVMInterpreter = struct {
-    pub fn execute(allocator: *const std.mem.Allocator, vm: *ZJVM) !void {
+    vm: *ZJVM,
+    print_alloc: std.mem.Allocator,
+
+    pub fn init(vm: *ZJVM) !JVMInterpreter {
+        return JVMInterpreter{
+            .print_alloc = std.heap.page_allocator,
+            .vm = vm,
+        };
+    }
+
+    pub fn execute(self: *JVMInterpreter, allocator: *std.mem.Allocator) !void {
         while (true) {
-            const frame = vm.currentFrame() orelse return error.NoFrame;
+            const frame = self.vm.currentFrame() orelse return error.NoFrame;
 
             if (frame.codeAttr.std_function != null) {
                 const std_func = frame.codeAttr.std_function.?;
                 switch (std_func) {
                     .Println => {
                         const value = frame.local_vars.vars[0];
+                        const ref = frame.local_vars.vars[1];
+                        
+                        const ps: *PrintStream = @ptrCast(@alignCast(ref.Reference));
+
+                        if (ps.stream == null) {
+                            return error.NullPointerException;
+                        }
+
+                        const stream = ps.stream.?;
+
+                        var value_str: ?[]const u8 = null;
+
                         switch (value) {
                             .Int => |i| {
-                                std.debug.print("{d}\n", .{i});
+                                value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{i}) catch return error.OutOfMemory;
                             },
                             .Float => |f| {
-                                std.debug.print("{d}\n", .{f});
+                                value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{f}) catch return error.OutOfMemory;
+                            },
+                            .Double => |d| {
+                                value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{d}) catch return error.OutOfMemory;
                             },
                             .Reference => |r| {
-                                const js: *JavaString = @ptrFromInt(r);
-                                std.debug.print("{s}\n", .{js.bytes});
+                                const js: *JavaString = @ptrCast(@alignCast(r));
+                                value_str = js.bytes;
                             },
                             else => {
                                 std.debug.print("Unsupported type for println\n", .{});
                             },
+                        }
+                        if (value_str) |vs| {
+                            _ = try stream.write(vs);
+                            _ = try stream.write("\n");
+                        } else {
+                            return error.UnsupportedStdFunction;
                         }
                     },
                     else => {
                         return error.UnsupportedStdFunction;
                     },
                 }
-                _ = try vm.popFrame();
-                if (vm.stack.top == 0) break;
+                _ = try self.vm.popFrame();
+                if (self.vm.stack.top == 0) break;
                 continue;
             }
 
             if (frame.pc >= frame.getCodeLength()) {
-                _ = try vm.popFrame();
-                if (vm.stack.top == 0) break;
+                _ = try self.vm.popFrame();
+                if (self.vm.stack.top == 0) break;
                 continue;
             }
 
@@ -63,6 +96,7 @@ pub const JVMInterpreter = struct {
             }
 
             const opcode: OpcodeEnum = @enumFromInt(frame.getCodeByte(frame.pc));
+
             switch (opcode) {
                 OpcodeEnum.Nop => {
                     // Do nothing
@@ -134,7 +168,7 @@ pub const JVMInterpreter = struct {
                                 .bytes = str_bytes,
                             };
 
-                            try frame.operand_stack.push(Value{ .Reference = @intFromPtr(java_string) });
+                            try frame.operand_stack.push(Value{ .Reference = @ptrCast(@alignCast(java_string)) });
                         },
                         else => {
                             return error.InvalidConstantType;
@@ -420,7 +454,7 @@ pub const JVMInterpreter = struct {
                         new_frame.local_vars.vars[method.num_params - 1 - i] = arg;
                     }
 
-                    try vm.pushFrame(new_frame);
+                    try self.vm.pushFrame(new_frame);
                     continue;
                 },
                 OpcodeEnum.GoTo => {
@@ -437,19 +471,19 @@ pub const JVMInterpreter = struct {
                 OpcodeEnum.IReturn => {
                     const return_value = try frame.operand_stack.pop();
 
-                    _ = try vm.stack.pop();
+                    _ = try self.vm.stack.pop();
 
-                    if (vm.stack.top == 0) {
+                    if (self.vm.stack.top == 0) {
                         break;
                     }
 
-                    var caller = vm.stack.current();
+                    var caller = self.vm.stack.current();
                     try caller.operand_stack.push(return_value);
 
                     continue;
                 },
                 OpcodeEnum.Return => { // return
-                    _ = try vm.stack.pop();
+                    _ = try self.vm.stack.pop();
                     return;
                 },
                 OpcodeEnum.GetStatic => { // getstatic
@@ -460,8 +494,8 @@ pub const JVMInterpreter = struct {
 
                     const fieldref = try frame.class.getFieldRef(index);
 
-                    const name_and_type_cp = try frame.class.getConstant(fieldref.name_and_type_index);
                     const class = try frame.class.getConstantUtf8(fieldref.class_index);
+                    const name_and_type_cp = try frame.class.getConstant(fieldref.name_and_type_index);
 
                     switch (name_and_type_cp) {
                         .NameAndType => |name_and_type| {
@@ -472,7 +506,10 @@ pub const JVMInterpreter = struct {
                                     if (std.mem.eql(u8, class, "java/lang/System")) {
                                         if (std.mem.eql(u8, name_str, "out")) {
                                             const ps = try allocator.create(PrintStream);
-                                            try frame.operand_stack.push(Value{ .Reference = @intFromPtr(ps) });
+                                            ps.* = PrintStream{
+                                                .stream = std.fs.File.stdout(),
+                                            };
+                                            try frame.operand_stack.push(Value{ .Reference = ps });
                                         } else {
                                             std.debug.print("Error: Unsupported static field name {s} in class {any}\n", .{ name_str, class });
                                             return error.FieldNotFound;
@@ -526,12 +563,9 @@ pub const JVMInterpreter = struct {
                     const this_ref = try frame.operand_stack.pop(); // PrintStream
 
                     new_frame.local_vars.vars[0] = arg;
-                    // this_ref lo puoi ignorare ORA, ma DEVI consumarlo
                     new_frame.local_vars.vars[1] = this_ref;
 
-                    // For now, we are not using obj_ref, but in a full implementation, we would need to handle it.
-
-                    try vm.pushFrame(new_frame);
+                    try self.vm.pushFrame(new_frame);
                     continue;
                 },
             }

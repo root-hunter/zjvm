@@ -51,7 +51,7 @@ pub const Frame = struct {
                 v.ValueTag.Float => std.debug.print("{d} (Float)\n", .{val.Float}),
                 v.ValueTag.Long => std.debug.print("{d} (Long)\n", .{val.Long}),
                 v.ValueTag.Double => std.debug.print("{d} (Double)\n", .{val.Double}),
-                v.ValueTag.Reference => std.debug.print("0x{x} (Reference)\n", .{val.Reference}),
+                v.ValueTag.Reference => std.debug.print("{any} (Reference)\n", .{val.Reference}),
                 v.ValueTag.ArrayRef => std.debug.print("{any} (ArrayRef)\n", .{val.ArrayRef}),
             }
         }

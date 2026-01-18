@@ -32,7 +32,8 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
         if (method.code) |codeAttr| {
             var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            try i.JVMInterpreter.execute(&allocator, &vm);
+            var interpreter = try i.JVMInterpreter.init(&vm);
+            try interpreter.execute(&allocator);
 
             try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
 

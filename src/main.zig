@@ -9,7 +9,7 @@ const JVMInterpreter = @import("engine/interpreter.zig").JVMInterpreter;
 const ZJVM = @import("engine/vm.zig").ZJVM;
 
 pub fn main() !void {
-    const allocator = std.heap.page_allocator;
+    var allocator = std.heap.page_allocator;
 
     var argv = try std.process.argsWithAllocator(allocator);
     defer argv.deinit();
@@ -50,7 +50,8 @@ pub fn main() !void {
 
             var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            try JVMInterpreter.execute(&allocator, &vm);
+            var interpreter = try JVMInterpreter.init(&vm);
+            try interpreter.execute(&allocator);
             frame.dump();
 
             std.debug.print("Execution of 'main' completed.\n", .{});

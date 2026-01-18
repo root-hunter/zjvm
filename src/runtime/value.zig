@@ -13,7 +13,7 @@ pub const Value = union(ValueTag) {
     Float: f32,
     Long: i64,
     Double: f64,
-    Reference: usize,
+    Reference: ?*anyopaque,
     ArrayRef: ?*[]Value,
     Top: void,
 };
