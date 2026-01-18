@@ -177,6 +177,70 @@ test "ZJVM Test Suite 9 Double Arithmetic" {
     _ = try makeTestSuite(filePath, &expectedValues);
 }
 
+test "ZJVM Test Suite 10 Stdout Tests" {
+    const filePath = "samples/TestSuite10.class";
+    const logFilePath = "samples/outputs/test_suite_10.log";
+    const expectedLines = [_][]const u8{ "1024", "Hello, World! My name is ZJVM.", "This is Test Suite 10.", "12.12", "34.56", "7890123456", "1", "90" };
+
+    var allocator = std.heap.page_allocator;
+
+    var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
+    defer file.close();
+
+    const file_size = try file.getEndPos();
+    const data = try file.readToEndAlloc(allocator, file_size);
+    defer allocator.free(data);
+
+    var cursor = utils.Cursor.init(data);
+    var classInfo = parser.ClassInfo.init(&allocator);
+    defer classInfo.deinit();
+
+    try classInfo.parse(&cursor);
+
+    const mMain = try classInfo.getMethod("main");
+    var vm = try ZJVM.init(&allocator, 1024);
+
+    const res = std.fs.cwd().makeDir("samples/outputs");
+
+    if (res != error.PathAlreadyExists) {
+        try res;
+    }
+
+    const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
+
+    if (mMain) |method| {
+        if (method.code) |codeAttr| {
+            const frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
+            try vm.pushFrame(frame);
+            var interpreter = try i.JVMInterpreter.init(&vm);
+            interpreter.setStdout(logFile);
+            try interpreter.execute(&allocator);
+
+            // Compare log file with expected output
+
+            const logData = try std.fs.cwd().readFileAlloc(allocator, logFilePath, 1024 * 1024);
+            defer allocator.free(logData);
+
+            var logCursor = utils.Cursor.init(logData);
+            var line_index: usize = 0;
+
+            while (logCursor.position < logData.len and line_index < expectedLines.len) : (line_index += 1) {
+                const line = try logCursor.readUntilDelimiterOrEof('\n');
+                const expected_line = expectedLines[line_index];
+                try testing.expectEqualSlices(u8, expected_line, line);
+            }
+
+            if (line_index != expectedLines.len) {
+                return error.IncorrectNumberOfOutputLines;
+            }
+        } else {
+            return error.NoCodeAttribute;
+        }
+    } else {
+        return error.MethodMainNotFound;
+    }
+}
+
 // Import all test files to include them in the test suite
 test {
     _ = @import("runtime/value_test.zig");

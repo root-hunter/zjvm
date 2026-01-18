@@ -2,3 +2,4 @@
 /.zig-cache
 /samples/*.class
 /logs
+/samples/outputs/*.log

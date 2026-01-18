@@ -56,6 +56,22 @@ pub const Cursor = struct {
         self.position += length;
         return bytes;
     }
+
+    pub fn readUntilDelimiterOrEof(self: *Cursor, delimiter: u8) ![]const u8 {
+        const start = self.position;
+
+        while (self.position < self.buffer.len) : (self.position += 1) {
+            if (self.buffer[self.position] == delimiter) {
+                const line = self.buffer[start .. self.position];
+                self.position += 1; // Skip the delimiter
+                return line;
+            }
+        }
+
+        // If we reach here, we hit EOF
+        const line = self.buffer[start .. self.position];
+        return line;
+    }
 };
 
 pub fn countMethodParameters(descriptor: []const u8) !usize {

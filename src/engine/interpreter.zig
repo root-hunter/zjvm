@@ -20,12 +20,22 @@ pub const JavaString = struct {
 pub const JVMInterpreter = struct {
     vm: *ZJVM,
     print_alloc: std.mem.Allocator,
+    stdout: std.fs.File = std.fs.File.stdout(),
+    stdin: std.fs.File = std.fs.File.stdin(),
 
     pub fn init(vm: *ZJVM) !JVMInterpreter {
         return JVMInterpreter{
             .print_alloc = std.heap.page_allocator,
             .vm = vm,
         };
+    }
+
+    pub fn setStdout(self: *JVMInterpreter, file: std.fs.File) void {
+        self.stdout = file;
+    }
+
+    pub fn setStdin(self: *JVMInterpreter, file: std.fs.File) void {
+        self.stdin = file;
     }
 
     pub fn execute(self: *JVMInterpreter, allocator: *std.mem.Allocator) !void {
@@ -521,7 +531,7 @@ pub const JVMInterpreter = struct {
                                             if (std.mem.eql(u8, name_str, "out")) {
                                                 const ps = try allocator.create(PrintStream);
                                                 ps.* = PrintStream{
-                                                    .stream = std.fs.File.stdout(),
+                                                    .stream = self.stdout,
                                                 };
                                                 try frame.operand_stack.push(Value{ .Reference = ps });
                                             } else {

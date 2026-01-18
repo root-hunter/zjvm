@@ -9,21 +9,12 @@ const JVMInterpreter = @import("engine/interpreter.zig").JVMInterpreter;
 const ZJVM = @import("engine/vm.zig").ZJVM;
 
 pub fn main() !void {
+    const expectedLines = [_][]const u8{ "1024", "Hello, World! My name is ZJVM.", "This is Test Suite 10.", "12.12", "34.56", "7890123456", "1", "90", "" };
+
     var allocator = std.heap.page_allocator;
+    const filePath = "samples/TestSuite10.class";
 
-    var argv = try std.process.argsWithAllocator(allocator);
-    defer argv.deinit();
-
-    _ = argv.next();
-
-    const class_path = argv.next() orelse {
-        std.debug.print("Usage: zjvm <ClassFilePath>\n", .{});
-        return;
-    };
-
-    std.debug.print("Loading class file: {s}\n", .{class_path});
-
-    var file = try std.fs.cwd().openFile(class_path, .{ .mode = .read_only });
+    var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
     defer file.close();
 
     const file_size = try file.getEndPos();
@@ -37,26 +28,42 @@ pub fn main() !void {
     try classInfo.parse(&cursor);
 
     const mMain = try classInfo.getMethod("main");
-
-    std.debug.print("Method 'main' found: {any}\n", .{mMain});
-
-    try classInfo.dump();
-
     var vm = try ZJVM.init(&allocator, 1024);
+
+    // Create outputs directory if it doesn't exist
+    const res = std.fs.cwd().makeDir("samples/outputs");
+
+    if (res != error.PathAlreadyExists) {
+        try res;
+    }
+
+    const logFile = try std.fs.cwd().createFile("samples/outputs/test_suite_10.log", .{ .truncate = true, .read = true });
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
-            std.debug.print("Starting execution of 'main'...\n", .{});
-
-            var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
+            const frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
             var interpreter = try JVMInterpreter.init(&vm);
+            interpreter.setStdout(logFile);
             try interpreter.execute(&allocator);
-            frame.dump();
 
-            std.debug.print("Execution of 'main' completed.\n", .{});
-        } else {
-            std.debug.print("No code attribute found for method 'main'\n", .{});
+
+            const logData = try std.fs.cwd().readFileAlloc(allocator, "samples/outputs/test_suite_10.log", 1024 * 1024);
+            defer allocator.free(logData);
+            
+            var logCursor = utils.Cursor.init(logData);
+            var line_index: usize = 0;
+
+            std.debug.print("LogData Len: {}\n", .{logData.len});
+
+            while (logCursor.position < logData.len and line_index < expectedLines.len) : (line_index += 1) {
+                const line = try logCursor.readUntilDelimiterOrEof('\n');
+                const expected_line = expectedLines[line_index];
+                std.debug.print("Expected: '{s}'\n", .{expected_line});
+                std.debug.print("Got:      '{s}'\n", .{line});
+            }
+
+            std.debug.print("Line size: {}\n", .{line_index});
         }
     }
 }
