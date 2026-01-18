@@ -35,11 +35,6 @@ pub const JVMInterpreter = struct {
             if (frame.std_function != null) {
                 const std_func = frame.std_function.?;
                 const method = std_func.method;
-                const num_params = method.num_params;
-
-                std.debug.print("Invoking virtual method: {s}\n", .{method.name});
-                std.debug.print("Method Descriptor: {s}\n", .{method.descriptor});
-                std.debug.print("Number of parameters: {d}\n", .{num_params});
 
                 switch (std_func.func) {
                     .Println => {
@@ -563,10 +558,6 @@ pub const JVMInterpreter = struct {
                         }
 
                         const params = try method.?.getParameterTypes();
-
-                        for (params) |param| {
-                            std.debug.print("Parameter Type: {s}\n", .{param.bytes});
-                        }
 
                         if (params.len + 1 > frame.operand_stack.size) {
                             std.debug.print("Error: Not enough operands on stack for method invocation. Needed {d}, but stack size is {d}\n", .{ params.len + 1, frame.operand_stack.size });
