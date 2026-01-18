@@ -21,8 +21,8 @@ pub const Frame = struct {
         class: *const p.ClassInfo,
     ) !Frame {
         return Frame{
-            .operand_stack = try OperandStack.init(allocator, codeAttr .max_stack),
-            .local_vars = try LocalVars.init(allocator, codeAttr .max_locals),
+            .operand_stack = try OperandStack.init(allocator, codeAttr.max_stack),
+            .local_vars = try LocalVars.init(allocator, codeAttr.max_locals),
             .codeAttr = codeAttr,
             .pc = 0,
             .std_function = null,

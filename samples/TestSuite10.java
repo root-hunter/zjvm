@@ -7,5 +7,7 @@ public class TestSuite10 {
       System.out.println(12.12);
       System.out.println(34.56f);
       System.out.println(7890123456L);
+      System.out.println(true);
+      System.out.println('Z');
    }
 }
