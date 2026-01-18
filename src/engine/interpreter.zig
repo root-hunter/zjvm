@@ -264,6 +264,10 @@ pub const JVMInterpreter = struct {
                         const value = frame.local_vars.vars[3];
                         try frame.operand_stack.pushDouble(value.Double);
                     },
+                    OpcodeEnum.ALoad1 => { // aload_1
+                        const value = frame.local_vars.vars[1];
+                        try frame.operand_stack.push(value);
+                    },
                     OpcodeEnum.AALoad => { // aaload
                         const index_value = try frame.operand_stack.pop();
                         const arrayref_value = try frame.operand_stack.pop();
@@ -315,6 +319,10 @@ pub const JVMInterpreter = struct {
                     OpcodeEnum.DStore3 => { // dstore_3
                         const value = try frame.operand_stack.popDouble();
                         frame.local_vars.vars[3] = Value{ .Double = value };
+                    },
+                    OpcodeEnum.AStore1 => { // astore_1
+                        const value = try frame.operand_stack.pop();
+                        frame.local_vars.vars[1] = value;
                     },
                     OpcodeEnum.ISub => { // isub
                         const b = (try frame.operand_stack.pop()).Int;
