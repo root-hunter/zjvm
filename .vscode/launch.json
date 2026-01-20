@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceRoot}/zig-out/zjvm-debug",
+            "args": [
+                "${workspaceRoot}/samples/TestSuite11.class"
+            ],
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "make build-debug"
+        }
+    ]
+}

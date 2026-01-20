@@ -2,6 +2,12 @@
 RELEASE_VERSION = $(shell grep -oP '\.version = "\K[^"]+' build.zig.zon)
 RELEASE_MODE ?= safe
 
+build-debug:
+	@echo "Building ZJVM in debug mode with LLVM backend..."
+	rm -rf zig-out/zjvm-debug
+	zig build-exe -fllvm src/main.zig -femit-bin=zig-out/zjvm-debug -Doptimize=Debug
+	@echo "ZJVM debug build complete."
+
 build-samples:
 	@echo "Building sample Java class files..."
 	javac samples/*.java
@@ -9,7 +15,7 @@ build-samples:
 
 build:
 	@echo "Building ZJVM..."
-	zig build
+	zig build -Doptimize=Debug
 	@echo "ZJVM build complete."
 
 build-release:
