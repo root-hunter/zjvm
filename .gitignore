@@ -3,3 +3,4 @@
 /samples/*.class
 /logs
 /samples/outputs/*.log
+/debug

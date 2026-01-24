@@ -14,7 +14,7 @@ pub const FrameJSON = struct {
     code_length: usize,
 
     // ZJVM adds
-    class_name: p.ClassInfoJSON,
+    class: p.ClassInfoJSON,
 
     pub fn init(frame: Frame) !FrameJSON {
         return FrameJSON{
@@ -22,7 +22,7 @@ pub const FrameJSON = struct {
             .local_vars = try frame.local_vars.toJSON(),
             .pc = frame.pc,
             .code_length = frame.getCodeLength(),
-            .class_name = try frame.class.toJSON(),
+            .class = try frame.class.toJSON(),
         };
     }
 };

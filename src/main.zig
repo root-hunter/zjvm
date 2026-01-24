@@ -36,7 +36,7 @@ pub fn main() !void {
 
     try classInfo.parse(&cursor);
 
-    const json_file_path = "export.json";
+    const json_file_path = "debug/export.json";
 
     var out = std.Io.Writer.Allocating.init(allocator);
     const writer = &out.writer;
