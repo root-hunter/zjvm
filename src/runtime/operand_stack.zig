@@ -51,7 +51,31 @@ pub const OperandStack = struct {
         return self.data[self.top];
     }
 
+    pub fn pushFloat(self: *OperandStack, v: f32) !void {
+        if (self.top >= self.data.len)
+            return error.StackOverflow;
+
+        self.data[self.top] = Value{ .Float = v };
+        self.top += 1;
+    }
+
+    pub fn popFloat(self: *OperandStack) !f32 {
+        if (self.top == 0)
+            return error.StackUnderflow;
+
+        self.top -= 1;
+
+        const val = self.data[self.top];
+        return switch (val) {
+            .Float => |f| f,
+            else => error.TypeMismatch,
+        };
+    }
+
     pub fn pushLong(self: *OperandStack, v: i64) !void {
+        if (self.top + 1 >= self.data.len)
+            return error.StackOverflow;
+
         self.data[self.top] = Value{ .Long = v };
         self.data[self.top + 1] = Value.Top;
         self.top += 2;
