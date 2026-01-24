@@ -49,6 +49,7 @@ publish-release: build-release test
 	git tag -a "v$(RELEASE_VERSION)" -m "Release version v$(RELEASE_VERSION)"
 	git commit -m "Update ZJVM to version v$(RELEASE_VERSION)"
 	git push origin v$(RELEASE_VERSION)
+	git push origin main
 	@echo "ZJVM pushed to remote repository."
 
 print-version:
