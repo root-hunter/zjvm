@@ -253,6 +253,36 @@ test "ZJVM Test Suite 11 Stdout Tests" {
     try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
 }
 
+test "ZJVM Test Suite 12 Stdout Tests" {
+    const filePath = "samples/TestSuite12.class";
+    const logFilePath = "samples/outputs/test_suite_12.log";
+    const expectedLines = [_][]const u8{
+        "This is Test Suite 12.",
+        "X = 42",
+        "Y = 84",
+        "Z = 28",
+        "A is less than B",
+        "P is greater than or equal to Q",
+        "Value of Pi: 3.14159",
+        "0 is divisible by 15",
+        "3 is divisible by 3",
+        "5 is divisible by 5",
+        "6 is divisible by 3",
+        "9 is divisible by 3",
+        "10 is divisible by 5",
+        "12 is divisible by 3",
+        "15 is divisible by 15",
+        "18 is divisible by 3",
+        "20 is divisible by 5",
+        "21 is divisible by 3",
+        "24 is divisible by 3",
+        "25 is divisible by 5",
+        "27 is divisible by 3",
+        "30 is divisible by 15",
+    };
+    try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
+}
+
 // Import all test files to include them in the test suite
 test {
     _ = @import("runtime/value_test.zig");

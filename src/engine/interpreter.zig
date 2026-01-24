@@ -401,6 +401,11 @@ pub const JVMInterpreter = struct {
                         current_value += increment;
                         frame.local_vars.vars[index] = Value{ .Int = current_value };
                     },
+                    OpcodeEnum.I2D => { // i2d
+                        const int_value = try frame.operand_stack.pop();
+                        const d_value: f64 = @floatFromInt(int_value.Int);
+                        try frame.operand_stack.pushDouble(d_value);
+                    },
                     OpcodeEnum.D2I => {
                         const d = try frame.operand_stack.popDouble();
 
@@ -414,7 +419,42 @@ pub const JVMInterpreter = struct {
 
                         try frame.operand_stack.push(Value{ .Int = i });
                     },
-                    OpcodeEnum.IfCmpGe => { // if_icmpge
+                    OpcodeEnum.IfNe => { // ifne
+                        const value = try frame.operand_stack.pop();
+
+                        const offset_high = frame.getCodeByte(frame.pc + 1);
+                        const offset_low = frame.getCodeByte(frame.pc + 2);
+
+                        const high: i16 = @intCast(offset_high);
+                        const low: i16 = @intCast(offset_low);
+
+                        const branch_offset: i16 = (high << 8) | low;
+
+                        if (value.Int != 0) {
+                            const b: i32 = @intCast(frame.pc);
+                            frame.pc = @intCast(b + branch_offset);
+                            continue;
+                        }
+                    },
+                    OpcodeEnum.IfICmpLt => { // if_icmplt
+                        const value2 = try frame.operand_stack.pop();
+                        const value1 = try frame.operand_stack.pop();
+
+                        const offset_high = frame.getCodeByte(frame.pc + 1);
+                        const offset_low = frame.getCodeByte(frame.pc + 2);
+
+                        const high: i16 = @intCast(offset_high);
+                        const low: i16 = @intCast(offset_low);
+
+                        const branch_offset: i16 = (high << 8) | low;
+
+                        if (value1.Int < value2.Int) {
+                            const b: i32 = @intCast(frame.pc);
+                            frame.pc = @intCast(b + branch_offset);
+                            continue;
+                        }
+                    },
+                    OpcodeEnum.IfICmpGe => { // if_icmpge
                         const value2 = try frame.operand_stack.pop();
                         const value1 = try frame.operand_stack.pop();
 
@@ -432,7 +472,7 @@ pub const JVMInterpreter = struct {
                             continue;
                         }
                     },
-                    OpcodeEnum.IfCmpGt => { // if_icmpgt
+                    OpcodeEnum.IfICmpGt => { // if_icmpgt
                         const value2 = try frame.operand_stack.pop();
                         const value1 = try frame.operand_stack.pop();
 
@@ -450,7 +490,7 @@ pub const JVMInterpreter = struct {
                             continue;
                         }
                     },
-                    OpcodeEnum.IfCmpLe => { // if_icmple
+                    OpcodeEnum.IfICmpLe => { // if_icmple
                         const value2 = try frame.operand_stack.pop();
                         const value1 = try frame.operand_stack.pop();
 
