@@ -673,16 +673,29 @@ pub const JVMInterpreter = struct {
                         var i: usize = 0;
                         var temp_params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
                         while (i < param_count) : (i += 1) {
-                            const v = try frame.operand_stack.pop();
+                            var v = try frame.operand_stack.pop();
+
+                            while (v == .Top) {
+                                v = try frame.operand_stack.pop();
+                            }
+
                             var s: ?[]const u8 = null;
 
                             switch (v) {
                                 .Int => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
+                                .Float => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
+                                .Long => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
+                                .Double => |x| {
+                                    s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x});
+                                },
                                 .Reference => |r| {
                                     const js: *JavaString = @ptrCast(@alignCast(r));
                                     s = js.bytes;
                                 },
-                                else => return error.UnsupportedType,
+                                else => {
+                                    std.debug.print("Unsupported parameter type for makeConcatWithConstants: {any}\n", .{v});
+                                    return error.UnsupportedType;
+                                },
                             }
 
                             if (s == null) return error.UnsupportedType;

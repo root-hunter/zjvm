@@ -30,11 +30,11 @@ pub const ValueJSON = struct {
             },
             .ArrayRef => ValueJSON{
                 .tag = "ArrayRef",
-                .value = null,
+                .value = try std.fmt.allocPrint(allocator, "{}", .{&v.ArrayRef.?}),
             },
             .Top => ValueJSON{
                 .tag = "Top",
-                .value = null,
+                .value = try std.fmt.allocPrint(allocator, "null", .{}),
             },
         };
     }

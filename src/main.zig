@@ -39,8 +39,8 @@ pub fn main() !void {
     const json_file_path = "debug/export.json";
 
     var out = std.Io.Writer.Allocating.init(allocator);
-    const writer = &out.writer;
     defer out.deinit();
+    //const writer = &out.writer;
 
     //try std.json.Stringify.value(.{ .id = 1, .name = "test" }, .{}, writer);
     // const obj = try classInfo.toJSON();
@@ -66,9 +66,9 @@ pub fn main() !void {
             try interpreter.execute(&allocator);
             frame.dump();
 
-            try std.json.Stringify.value(try frame.toJSON(), .{ .whitespace = .indent_1, .emit_null_optional_fields = true }, writer);
-            const json_str = out.written();
-            try json_file.writeAll(json_str);
+            // try std.json.Stringify.value(try frame.toJSON(), .{ .whitespace = .indent_1 }, writer);
+            // const json_str = out.written();
+            // try json_file.writeAll(json_str);
 
             std.debug.print("Execution of 'main' completed.\n", .{});
         } else {

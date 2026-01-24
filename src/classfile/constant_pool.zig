@@ -16,6 +16,8 @@ pub const InvokeDynamicRefInfo = struct {
     bootstrap_args: ?[]types.U2,
 };
 
+// TODO Fix json serialization for ConstantPoolEntry with InvokeDynamicRefInfo
+
 pub const CpTag = enum(types.U1) {
     Utf8 = 1,
     Integer = 3,
