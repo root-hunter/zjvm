@@ -624,7 +624,6 @@ pub const JVMInterpreter = struct {
                         }
                     },
                     OpcodeEnum.InvokeDynamic => {
-                        // --- LEGGO L'INDICE DALL'OPERANDO ---
                         const index: u16 = (@as(u16, frame.getCodeByte(frame.pc + 1)) << 8) | @as(u16, frame.getCodeByte(frame.pc + 2));
 
                         // --- COSTANTE CP ---
@@ -647,6 +646,7 @@ pub const JVMInterpreter = struct {
 
                         const name = try frame.class.getConstantUtf8(nat.name_index);
                         const descriptor = try frame.class.getConstantUtf8(nat.descriptor_index);
+                        const param_count: usize = utils.getParameterCount(descriptor);
 
                         if (!std.mem.eql(u8, name, "makeConcatWithConstants")) {
                             std.debug.print("Unsupported invokedynamic: {s}\n", .{name});
@@ -655,7 +655,6 @@ pub const JVMInterpreter = struct {
 
                         std.debug.print("Invokedynamic makeConcatWithConstants called with descriptor: {s}\n", .{descriptor});
 
-                        // --- LEGGO IL TEMPLATE DALLA BOOTSTRAP ARG[0] ---
                         if (bootstrap.bootstrap_args == null or bootstrap.bootstrap_args.?.len == 0) {
                             return error.InvalidBootstrapArgs;
                         }
@@ -664,85 +663,44 @@ pub const JVMInterpreter = struct {
                         const template_str = try frame.class.getConstantString(template_idx);
 
                         std.debug.print("  Template string: {s}\n", .{template_str});
+                        var res = try std.ArrayList(u8).initCapacity(self.print_alloc, 64);
+                        var param_idx: usize = 0;
+                        var params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
 
-                        // --- PREPARO LISTA PARTI PER CONCAT ---
-                        var parts = try std.ArrayList([]const u8).initCapacity(self.print_alloc, 10);
-
-                        // --- POP DEI PARAMETRI DALLA STACK ---
-                        const param_count: usize = utils.getParameterCount(descriptor);
                         std.debug.print("  Concatenating {d} parameters:\n", .{param_count});
 
                         var i: usize = 0;
                         while (i < param_count) : (i += 1) {
                             const v = try frame.operand_stack.pop();
+                            var s: ?[]const u8 = null;
+
                             switch (v) {
-                                .Int => |x| {
-                                    const s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x});
-                                    std.debug.print("    Param {d}: {s}\n", .{ i, s });
-                                    try parts.append(self.print_alloc, s);
-                                },
+                                .Int => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
                                 .Reference => |r| {
                                     const js: *JavaString = @ptrCast(@alignCast(r));
-                                    std.debug.print("    Param {d}: {s}\n", .{ i, js.bytes });
-                                    try parts.append(self.print_alloc, js.bytes);
+                                    s = js.bytes;
                                 },
                                 else => return error.UnsupportedType,
                             }
+
+                            if (s == null) {
+                                return error.UnsupportedType;
+                            }
+                            try params.append(self.print_alloc, s.?);
                         }
 
-                        // --- AGGIUNGO I BOOTSTRAP_ARGS ---
-                        if (bootstrap.bootstrap_args) |args| {
-                            for (args) |arg_idx| {
-                                std.debug.print("Arg Idx: {d}\n", .{arg_idx});
-
-                                const cp_entry = try frame.class.getConstantPoolEntry(arg_idx);
-
-                                var str: []const u8 = &[_]u8{}; // placeholder iniziale
-
-                                switch (cp_entry) {
-                                    .Utf8 => |s| {
-                                        str = s;
-                                    },
-                                    .String => |str_idx| {
-                                        const str_cp = try frame.class.getConstantPoolEntry(str_idx);
-                                        str = switch (str_cp) {
-                                            .Utf8 => |s| s,
-                                            else => return error.InvalidConstantPoolEntry,
-                                        };
-                                    },
-                                    .Integer => |ii| {
-                                        str = try std.fmt.allocPrint(self.print_alloc, "{}", .{ii});
-                                    },
-                                    .Long => |ll| {
-                                        str = try std.fmt.allocPrint(self.print_alloc, "{}", .{ll});
-                                    },
-                                    .Float => |ff| {
-                                        str = try std.fmt.allocPrint(self.print_alloc, "{}", .{ff});
-                                    },
-                                    .Double => |dd| {
-                                        str = try std.fmt.allocPrint(self.print_alloc, "{}", .{dd});
-                                    },
-                                    else => return error.UnsupportedType,
-                                }
-
-                                try parts.append(self.print_alloc, str);
+                        for (template_str) |c| {
+                            if (c == 0x01) {
+                                if (param_idx >= params.items.len) return error.InvalidParameterCount;
+                                try res.appendSlice(self.print_alloc, params.items[param_idx]);
+                                param_idx += 1;
+                            } else {
+                                try res.append(self.print_alloc, c);
                             }
                         }
 
-                        // --- CONCATENAZIONE FINALE ---
-                        var total_len: usize = 0;
-                        for (parts.items) |p| total_len += p.len;
-
-                        const buf = try allocator.alloc(u8, total_len);
-                        var off: usize = 0;
-                        for (parts.items) |p| {
-                            std.mem.copyForwards(u8, buf[off .. off + p.len], p);
-                            off += p.len;
-                        }
-
-                        // --- CREO JAVA STRING ---
                         const js = try allocator.create(JavaString);
-                        js.* = JavaString{ .bytes = buf };
+                        js.* = JavaString{ .bytes = res.items };
 
                         try frame.operand_stack.push(Value{
                             .Reference = @ptrCast(@alignCast(js)),
