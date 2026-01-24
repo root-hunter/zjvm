@@ -635,7 +635,7 @@ pub const JVMInterpreter = struct {
 
                         // --- BOOTSTRAP METHOD ---
                         const bootstrap = try frame.class.getBootstrapMethod(index);
-                        std.debug.print("Invokedynamic bootstrap method: {any}\n", .{bootstrap});
+                        // std.debug.print("Invokedynamic bootstrap method: {any}\n", .{bootstrap});
 
                         // --- NAME AND TYPE ---
                         const nat_cp = try frame.class.getConstantPoolEntry(indy.name_and_type_index);
@@ -653,7 +653,7 @@ pub const JVMInterpreter = struct {
                             return error.UnsupportedOpcode;
                         }
 
-                        std.debug.print("Invokedynamic makeConcatWithConstants called with descriptor: {s}\n", .{descriptor});
+                        // std.debug.print("Invokedynamic makeConcatWithConstants called with descriptor: {s}\n", .{descriptor});
 
                         if (bootstrap.bootstrap_args == null or bootstrap.bootstrap_args.?.len == 0) {
                             return error.InvalidBootstrapArgs;
@@ -662,14 +662,16 @@ pub const JVMInterpreter = struct {
                         const template_idx = bootstrap.bootstrap_args.?[0];
                         const template_str = try frame.class.getConstantString(template_idx);
 
-                        std.debug.print("  Template string: {s}\n", .{template_str});
+                        // std.debug.print("  Template string: {s}\n", .{template_str});
+
                         var res = try std.ArrayList(u8).initCapacity(self.print_alloc, 64);
                         var param_idx: usize = 0;
                         var params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
 
-                        std.debug.print("  Concatenating {d} parameters:\n", .{param_count});
+                        // std.debug.print("  Concatenating {d} parameters:\n", .{param_count});
 
                         var i: usize = 0;
+                        var temp_params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
                         while (i < param_count) : (i += 1) {
                             const v = try frame.operand_stack.pop();
                             var s: ?[]const u8 = null;
@@ -683,10 +685,14 @@ pub const JVMInterpreter = struct {
                                 else => return error.UnsupportedType,
                             }
 
-                            if (s == null) {
-                                return error.UnsupportedType;
-                            }
-                            try params.append(self.print_alloc, s.?);
+                            if (s == null) return error.UnsupportedType;
+
+                            try temp_params.append(self.print_alloc, s.?);
+                        }
+
+                        // --- Invertiamo l’array dei parametri per rispettare l’ordine JVM ---
+                        for (0..param_count) |j| {
+                            try params.append(self.print_alloc, temp_params.items[param_count - 1 - j]);
                         }
 
                         for (template_str) |c| {

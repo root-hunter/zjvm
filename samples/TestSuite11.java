@@ -11,6 +11,6 @@ public class TestSuite11 {
       System.out.println("This is Test Suite 11.");
 
       System.out.println("C = " + c);
-      System.out.println("D = " + d);
+      System.out.println("D = " + d + " bytes" + "( " + (d / 1024) + " KB )");
    }
 }
