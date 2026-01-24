@@ -49,9 +49,6 @@ pub fn main() !void {
     defer json_file.close();
 
     const mMain = try classInfo.getMethod("main");
-
-    std.debug.print("Method 'main' found: {any}\n", .{mMain});
-
     try classInfo.dump();
 
     var vm = try ZJVM.init(&allocator, 1024);
