@@ -5,9 +5,12 @@ const ac = @import("access_flags.zig");
 const utils = @import("utils.zig");
 
 const AttributesInfo = @import("attributes.zig").AttributesInfo;
+const AttributesInfoJSON = @import("attributes.zig").AttributesInfoJSON;
+
 const FieldInfo = @import("fields.zig").FieldInfo;
+const FieldInfoJSON = @import("fields.zig").FieldInfoJSON;
 const MethodInfo = @import("methods.zig").MethodInfo;
-const CodeAttribute = @import("code.zig").CodeAttribute;
+const MethodInfoJSON = @import("methods.zig").MethodInfoJSON;
 
 pub const RefInfo = struct {
     class_index: types.U2,
@@ -16,6 +19,89 @@ pub const RefInfo = struct {
 
 pub const FieldRefInfo = RefInfo;
 pub const MethodRefInfo = RefInfo;
+
+pub const ClassInfoJSON = struct {
+    magic: types.U4,
+    minor_version: types.U2,
+    major_version: types.U2,
+    constant_pool_count: types.U2,
+    constant_pool: []cp.ConstantPoolEntry,
+
+    access_flags: types.U2,
+
+    this_class: types.U2,
+    super_class: types.U2,
+
+    fields_count: types.U2,
+    fields: ?[]FieldInfoJSON,
+
+    methods_count: types.U2,
+    methods: ?[]MethodInfoJSON,
+
+    attributes_count: types.U2,
+    attributes: ?[]AttributesInfoJSON,
+
+    pub fn init(class: ClassInfo) !ClassInfoJSON {
+        var fields: ?[]FieldInfoJSON = null;
+
+        const allocator = std.heap.page_allocator;
+
+        var field_jsons = try std.ArrayList(FieldInfoJSON).initCapacity(allocator, class.fields_count);
+
+        if (class.fields) |f| {
+            defer field_jsons.deinit(allocator);
+
+            for (f) |field| {
+                try field_jsons.append(allocator, field.toJSON());
+            }
+
+            fields = try field_jsons.toOwnedSlice(allocator);
+        }
+
+        var methods: ?[]MethodInfoJSON = null;
+
+        if (class.methods) |m| {
+            var method_jsons = try std.ArrayList(MethodInfoJSON).initCapacity(allocator, class.methods_count);
+            defer method_jsons.deinit(allocator);
+
+            for (m) |method| {
+                try method_jsons.append(allocator, method.toJSON());
+            }
+
+            methods = try method_jsons.toOwnedSlice(allocator);
+        }
+
+        var attrs: ?[]AttributesInfoJSON = null;
+
+        if (class.attributes) |a| {
+            var attr_jsons = try std.ArrayList(AttributesInfoJSON).initCapacity(allocator, class.attributes_count);
+            defer attr_jsons.deinit(allocator);
+
+            for (a) |attr| {
+                try attr_jsons.append(allocator, attr.toJSON());
+            }
+
+            attrs = try attr_jsons.toOwnedSlice(allocator);
+        }
+
+        return ClassInfoJSON{
+            .magic = class.magic,
+            .minor_version = class.minor_version,
+            .major_version = class.major_version,
+            .constant_pool_count = class.constant_pool_count,
+            .constant_pool = class.constant_pool.?,
+            .access_flags = class.access_flags,
+            .this_class = class.this_class,
+            .super_class = class.super_class,
+            .fields_count = class.fields_count,
+            .fields = fields,
+            .methods_count = class.methods_count,
+            .methods = methods,
+            .attributes_count = class.attributes_count,
+            .attributes = attrs,
+        };
+    }
+};
 
 pub const ClassInfo = struct {
     allocator: *const std.mem.Allocator,
@@ -181,6 +267,11 @@ pub const ClassInfo = struct {
 
     pub fn getMethodRef(self: *const ClassInfo, index: types.U2) !MethodRefInfo {
         if (self.constant_pool) |constantPool| {
+            if (index == 0 or index > constantPool.len) {
+                std.debug.print("Error: Invalid constant pool index {d} for MethodRef.\n", .{index});
+                return error.InvalidConstantPoolIndex;
+            }
+
             const cp_entry = constantPool[@intCast(index - 1)];
 
             return switch (cp_entry) {
@@ -249,7 +340,7 @@ pub const ClassInfo = struct {
         };
     }
 
-    pub fn getCpEntry(
+    pub fn getConstantPoolEntry(
         self: *const ClassInfo,
         index: u16,
     ) !cp.ConstantPoolEntry {
@@ -337,6 +428,10 @@ pub const ClassInfo = struct {
         } else {
             return null;
         }
+    }
+
+    pub fn toJSON(self: *const ClassInfo) !ClassInfoJSON {
+        return try ClassInfoJSON.init(self.*);
     }
 
     pub fn deinit(self: *ClassInfo) void {

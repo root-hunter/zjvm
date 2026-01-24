@@ -54,6 +54,7 @@ pub const OpcodeEnum = enum(u8) {
     Return = 0xb1,
     GetStatic = 0xb2,
     InvokeVirtual = 0xb6,
+    InvokeDynamic = 0xba,
 
     pub fn getOperandFormat(self: OpcodeEnum) OperandFormat {
         return switch (self) {
@@ -81,6 +82,7 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.InvokeStatic => 3, // invokestatic <indexbyte1> <indexbyte2>
             OpcodeEnum.GetStatic => 3, // getstatic <indexbyte1> <indexbyte2>
             OpcodeEnum.InvokeVirtual => 3, // invokevirtual <indexbyte1> <indexbyte2>
+            OpcodeEnum.InvokeDynamic => 5, // invokedynamic <indexbyte1> <indexbyte2> 0 0
             else => 1, // nessun operand
         };
     }
@@ -142,6 +144,7 @@ pub const OpcodeEnum = enum(u8) {
             OpcodeEnum.Return => "return",
             OpcodeEnum.GetStatic => "getstatic",
             OpcodeEnum.InvokeVirtual => "invokevirtual",
+            OpcodeEnum.InvokeDynamic => "invokedynamic",
         };
     }
 };

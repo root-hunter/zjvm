@@ -4,6 +4,24 @@ const utils = @import("utils.zig");
 const a = @import("attributes.zig");
 const p = @import("parser.zig");
 
+pub const FieldInfoJSON = struct {
+    access_flags: types.U2,
+    name_index: types.U2,
+    descriptor_index: types.U2,
+    attributes_count: types.U2,
+    attributes: ?[]a.AttributesInfo,
+
+    pub fn init(field: FieldInfo) FieldInfoJSON {
+        return FieldInfoJSON{
+            .access_flags = field.access_flags,
+            .name_index = field.name_index,
+            .descriptor_index = field.descriptor_index,
+            .attributes_count = field.attributes_count,
+            .attributes = field.attributes,
+        };
+    }
+};
+
 pub const FieldInfo = struct {
     allocator: *const std.mem.Allocator,
 
@@ -53,6 +71,10 @@ pub const FieldInfo = struct {
         }
 
         return fields;
+    }
+
+    pub fn toJSON(self: *const FieldInfo) FieldInfoJSON {
+        return FieldInfoJSON.init(self.*);
     }
 
     pub fn deinit(self: *FieldInfo) void {

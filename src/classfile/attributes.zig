@@ -5,6 +5,23 @@ const utils = @import("utils.zig");
 const CodeAttribute = @import("code.zig").CodeAttribute;
 const p = @import("parser.zig");
 
+pub const AttributesInfoJSON = struct {
+    attribute_name_index: types.U2,
+    attribute_length: types.U4,
+    info: []const u8,
+
+    name: []const u8,
+
+    pub fn init(attr: AttributesInfo) AttributesInfoJSON {
+        return AttributesInfoJSON{
+            .attribute_name_index = attr.attribute_name_index,
+            .attribute_length = attr.attribute_length,
+            .info = attr.info,
+            .name = attr.name,
+        };
+    }
+};
+
 pub const AttributesInfo = struct {
     attribute_name_index: types.U2,
     attribute_length: types.U4,
@@ -37,5 +54,9 @@ pub const AttributesInfo = struct {
         }
 
         return attributes;
+    }
+
+    pub fn toJSON(self: *const AttributesInfo) AttributesInfoJSON {
+        return AttributesInfoJSON.init(self.*);
     }
 };

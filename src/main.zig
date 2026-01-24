@@ -36,6 +36,18 @@ pub fn main() !void {
 
     try classInfo.parse(&cursor);
 
+    var out = std.Io.Writer.Allocating.init(allocator);
+    const writer = &out.writer;
+    defer out.deinit();
+
+    //try std.json.Stringify.value(.{ .id = 1, .name = "test" }, .{}, writer);
+    const obj = try classInfo.toJSON();
+
+    try std.json.Stringify.value(obj, .{ .whitespace = .indent_2 }, writer);
+
+    const json_str = out.written();
+    std.debug.print("Class Info as JSON:\n{s}\n", .{json_str});
+
     const mMain = try classInfo.getMethod("main");
 
     std.debug.print("Method 'main' found: {any}\n", .{mMain});

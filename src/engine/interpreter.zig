@@ -8,6 +8,7 @@ const StdFunction = @import("../classfile/code.zig").StdFunction;
 const AttributesInfo = @import("../classfile/attributes.zig").AttributesInfo;
 const ExceptionTableEntry = @import("../classfile/code.zig").ExceptionTableEntry;
 const MethodInfo = @import("../classfile/methods.zig").MethodInfo;
+const utils = @import("../classfile/utils.zig");
 
 const PrintStream = struct {
     stream: ?std.fs.File,
@@ -20,13 +21,15 @@ pub const JavaString = struct {
 pub const JVMInterpreter = struct {
     vm: *ZJVM,
     print_alloc: std.mem.Allocator,
-    stdout: std.fs.File = std.fs.File.stdout(),
-    stdin: std.fs.File = std.fs.File.stdin(),
+    stdout: std.fs.File,
+    stdin: std.fs.File,
 
     pub fn init(vm: *ZJVM) !JVMInterpreter {
         return JVMInterpreter{
             .print_alloc = std.heap.page_allocator,
             .vm = vm,
+            .stdout = std.fs.File.stdout(),
+            .stdin = std.fs.File.stdin(),
         };
     }
 
@@ -53,7 +56,7 @@ pub const JVMInterpreter = struct {
 
                         const params = method.getParameterTypes() catch return error.InvalidMethodDescriptor;
 
-                        const is2Slots = std.mem.eql(u8, params[0].bytes, "D");
+                        const is2Slots = utils.is2SlotType(params[0].bytes);
 
                         if (is2Slots) {
                             _ = try frame.operand_stack.pop(); // Top slot
@@ -172,7 +175,7 @@ pub const JVMInterpreter = struct {
                         const index_byte = frame.getCodeByte(frame.pc + 1);
                         const index: u16 = @as(u16, index_byte);
 
-                        const entry = try frame.class.getCpEntry(index);
+                        const entry = try frame.class.getConstantPoolEntry(index);
 
                         switch (entry) {
                             .Integer => |int_value| {
@@ -204,7 +207,7 @@ pub const JVMInterpreter = struct {
 
                         const index: u16 = (index_high << 8) | index_low;
 
-                        const entry = try frame.class.getCpEntry(index);
+                        const entry = try frame.class.getConstantPoolEntry(index);
 
                         switch (entry) {
                             .Long => |long_value| {
@@ -596,7 +599,7 @@ pub const JVMInterpreter = struct {
                                 .method = method.?,
                             };
 
-                            const is2Slots = std.mem.eql(u8, params[0].bytes, "D") or std.mem.eql(u8, params[0].bytes, "J");
+                            const is2Slots = utils.is2SlotType(params[0].bytes);
 
                             const num_params = method.?.num_params + 1;
 
@@ -618,6 +621,83 @@ pub const JVMInterpreter = struct {
                             try self.vm.pushFrame(new_frame);
                             continue;
                         }
+                    },
+                    OpcodeEnum.InvokeDynamic => {
+                        // TODO handle invokedynamic
+                        const indexbyte1 = frame.getCodeByte(frame.pc + 1);
+                        const indexbyte2 = frame.getCodeByte(frame.pc + 2);
+                        const index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
+
+                        const entry = try frame.class.getConstantPoolEntry(index);
+
+                        const indy = switch (entry) {
+                            .InvokeDynamic => |i| i,
+                            else => return error.InvalidConstantPoolEntry,
+                        };
+
+                        const nat_cp = try frame.class.getConstantPoolEntry(indy.name_and_type_index);
+                        const nat = switch (nat_cp) {
+                            .NameAndType => |nt| nt,
+                            else => return error.InvalidConstantPoolEntry,
+                        };
+
+                        const name = try frame.class.getConstantUtf8(nat.name_index);
+                        const descriptor = try frame.class.getConstantUtf8(nat.descriptor_index);
+
+                        if (!std.mem.eql(u8, name, "makeConcatWithConstants")) {
+                            std.debug.print("Unsupported invokedynamic: {s}\n", .{name});
+                            return error.UnsupportedOpcode;
+                        }
+
+                        std.debug.print("Invokedynamic makeConcatWithConstants called with descriptor: {s}\n", .{descriptor});
+
+                        // --- PARSE PARAMS ---
+                        const param_count = 1;
+
+                        // --- POP ARGOMENTI ---
+                        var parts = try std.ArrayList([]const u8).initCapacity(self.print_alloc, 10);
+
+                        std.debug.print("  Concatenating {d} parameters:\n", .{param_count});
+
+                        var i: usize = 0;
+                        while (i < param_count) : (i += 1) {
+                            const v = try frame.operand_stack.pop();
+
+                            switch (v) {
+                                .Int => |x| {
+                                    const s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x});
+                                    std.debug.print("    Param {d}: {s}\n", .{ i, s });
+                                    try parts.append(self.print_alloc, s);
+                                },
+                                .Reference => |r| {
+                                    const js: *JavaString = @ptrCast(@alignCast(r));
+                                    std.debug.print("    Param {d}: {s}\n", .{ i, js.bytes });
+                                    try parts.append(self.print_alloc, js.bytes);
+                                },
+                                else => return error.UnsupportedType,
+                            }
+                        }
+
+                        // --- CONCAT ---
+                        var total_len: usize = 0;
+                        for (parts.items) |p| total_len += p.len;
+
+                        const buf = try allocator.alloc(u8, total_len);
+                        var off: usize = 0;
+                        for (parts.items) |p| {
+                            std.mem.copyBackwards(u8, buf[off..], p);
+                            off += p.len;
+                        }
+
+                        const js = try allocator.create(JavaString);
+                        js.* = JavaString{ .bytes = buf };
+
+                        try frame.operand_stack.push(Value{
+                            .Reference = @ptrCast(@alignCast(js)),
+                        });
+
+                        frame.pc += opcode.getOperandLength();
+                        continue;
                     },
                 }
 

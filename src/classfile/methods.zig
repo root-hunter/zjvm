@@ -5,6 +5,35 @@ const a = @import("attributes.zig");
 const ca = @import("code.zig");
 const p = @import("parser.zig");
 
+pub const MethodInfoJSON = struct {
+    access_flags: types.U2,
+    name_index: types.U2,
+    descriptor_index: types.U2,
+    attributes_count: types.U2,
+    attributes: ?[]a.AttributesInfo,
+
+    code: ?ca.CodeAttribute,
+
+    // ZJVM additions
+    name: []const u8,
+    descriptor: []const u8,
+    num_params: usize,
+
+    pub fn init(method: MethodInfo) MethodInfoJSON {
+        return MethodInfoJSON{
+            .access_flags = method.access_flags,
+            .name_index = method.name_index,
+            .descriptor_index = method.descriptor_index,
+            .attributes_count = method.attributes_count,
+            .attributes = method.attributes,
+            .code = method.code,
+            .name = method.name,
+            .descriptor = method.descriptor,
+            .num_params = method.num_params,
+        };
+    }
+};
+
 pub const MethodInfo = struct {
     allocator: *const std.mem.Allocator,
 
@@ -124,6 +153,10 @@ pub const MethodInfo = struct {
         } else {
             std.debug.print("  No code attribute\n", .{});
         }
+    }
+
+    pub fn toJSON(self: *const MethodInfo) MethodInfoJSON {
+        return MethodInfoJSON.init(self.*);
     }
 
     pub fn deinit(self: *MethodInfo) void {

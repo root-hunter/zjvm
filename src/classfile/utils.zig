@@ -162,3 +162,10 @@ pub fn getMethodParameterTypes(descriptor: []const u8) ![]types.Utf8Info {
 
     return types_list.toOwnedSlice(allocator);
 }
+
+pub fn is2SlotType(descriptor: []const u8) bool {
+    switch (descriptor[0]) {
+        'J', 'D' => return true,
+        else => return false,
+    }
+}
