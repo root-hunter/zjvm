@@ -169,3 +169,39 @@ pub fn is2SlotType(descriptor: []const u8) bool {
         else => return false,
     }
 }
+
+pub fn getParameterCount(descriptor: []const u8) usize {
+    var count: usize = 0;
+    var i: usize = 0;
+
+    if (descriptor.len == 0 or descriptor[0] != '(') {
+        return 0;
+    }
+    i += 1; // Skip '('
+
+    while (i < descriptor.len) : (i += 1) {
+        if (descriptor[i] == ')') break; // Stop here!
+
+        const c = descriptor[i];
+        switch (c) {
+            'B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z' => count += 1,
+            'L' => {
+                count += 1;
+                i += 1;
+                while (i < descriptor.len and descriptor[i] != ';') : (i += 1) {}
+            },
+            '[' => {
+                i += 1;
+                while (i < descriptor.len and descriptor[i] == '[') : (i += 1) {}
+                if (i < descriptor.len and descriptor[i] == 'L') {
+                    i += 1;
+                    while (i < descriptor.len and descriptor[i] != ';') : (i += 1) {}
+                }
+                count += 1;
+            },
+            else => {},
+        }
+    }
+
+    return count;
+}

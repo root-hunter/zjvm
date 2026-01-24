@@ -4,6 +4,7 @@ const utils = @import("utils.zig");
 const a = @import("attributes.zig");
 const ca = @import("code.zig");
 const p = @import("parser.zig");
+const cp = @import("constant_pool.zig");
 
 pub const MethodInfoJSON = struct {
     access_flags: types.U2,
@@ -93,7 +94,7 @@ pub const MethodInfo = struct {
         return methods;
     }
 
-    pub fn fromRef(allocator: *const std.mem.Allocator, class: *const p.ClassInfo, method_ref: p.MethodRefInfo) !?MethodInfo {
+    pub fn fromRef(allocator: *const std.mem.Allocator, class: *const p.ClassInfo, method_ref: cp.MethodRefInfo) !?MethodInfo {
         const nat_cp = try class.getConstant(method_ref.name_and_type_index);
         const nat = switch (nat_cp) {
             .NameAndType => |v| v,

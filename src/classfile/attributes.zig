@@ -56,6 +56,45 @@ pub const AttributesInfo = struct {
         return attributes;
     }
 
+    pub fn isBootstrapMethods(self: *const AttributesInfo) bool {
+        return std.mem.eql(u8, self.name, "BootstrapMethods");
+    }
+
+    pub fn getBootstrapMethods(self: *const AttributesInfo, class: *const p.ClassInfo) ![]cp.InvokeDynamicRefInfo {
+        if (!self.isBootstrapMethods()) {
+            return error.NotABootstrapMethodsAttribute;
+        }
+
+        var cursor = utils.Cursor.init(self.info);
+
+        const num_bootstrap_methods = try cursor.readU2();
+        var bootstrap_methods = try class.allocator.alloc(cp.InvokeDynamicRefInfo, @intCast(num_bootstrap_methods));
+
+        var i: usize = 0;
+        const max: usize = @intCast(num_bootstrap_methods);
+        while (i < max) : (i += 1) {
+            const bootstrap_method_attr_index = try cursor.readU2();
+            const num_args = try cursor.readU2();
+            var args: ?[]u16 = null;
+            if (num_args > 0) {
+                args = try class.allocator.alloc(u16, @intCast(num_args));
+                var j: usize = 0;
+                const max_args: usize = @intCast(num_args);
+                while (j < max_args) : (j += 1) {
+                    args.?[j] = try cursor.readU2();
+                }
+            }
+
+            bootstrap_methods[i] = cp.InvokeDynamicRefInfo{
+                .bootstrap_method_attr_index = bootstrap_method_attr_index,
+                .name_and_type_index = 0, // Questo poi lo imposti in base all'indice InvokeDynamic nella CP
+                .bootstrap_args = args,
+            };
+        }
+
+        return bootstrap_methods;
+    }
+
     pub fn toJSON(self: *const AttributesInfo) AttributesInfoJSON {
         return AttributesInfoJSON.init(self.*);
     }

@@ -2,6 +2,20 @@ const std = @import("std");
 const types = @import("types.zig");
 const utils = @import("utils.zig");
 
+pub const RefInfo = struct {
+    class_index: types.U2,
+    name_and_type_index: types.U2,
+};
+
+pub const FieldRefInfo = RefInfo;
+pub const MethodRefInfo = RefInfo;
+
+pub const InvokeDynamicRefInfo = struct {
+    bootstrap_method_attr_index: types.U2,
+    name_and_type_index: types.U2,
+    bootstrap_args: ?[]types.U2,
+};
+
 pub const CpTag = enum(types.U1) {
     Utf8 = 1,
     Integer = 3,
@@ -30,14 +44,8 @@ pub const ConstantPoolEntry = union(CpTag) {
     Double: f64,
     Class: u16,
     String: u16,
-    Fieldref: struct {
-        class_index: u16,
-        name_and_type_index: u16,
-    },
-    Methodref: struct {
-        class_index: u16,
-        name_and_type_index: u16,
-    },
+    Fieldref: FieldRefInfo,
+    Methodref: MethodRefInfo,
     InterfaceMethodref: struct {
         class_index: u16,
         name_and_type_index: u16,
@@ -55,10 +63,7 @@ pub const ConstantPoolEntry = union(CpTag) {
         bootstrap_method_attr_index: u16,
         name_and_type_index: u16,
     },
-    InvokeDynamic: struct {
-        bootstrap_method_attr_index: u16,
-        name_and_type_index: u16,
-    },
+    InvokeDynamic: InvokeDynamicRefInfo,
     Module: u16,
     Package: u16,
 
@@ -137,7 +142,12 @@ pub const ConstantPoolEntry = union(CpTag) {
             CpTag.InvokeDynamic => |_| {
                 const bootstrap_method_attr_index = try cursor.readU2();
                 const name_and_type_index = try cursor.readU2();
-                return ConstantPoolEntry{ .InvokeDynamic = .{ .bootstrap_method_attr_index = bootstrap_method_attr_index, .name_and_type_index = name_and_type_index } };
+
+                return ConstantPoolEntry{ .InvokeDynamic = .{
+                    .bootstrap_method_attr_index = bootstrap_method_attr_index,
+                    .name_and_type_index = name_and_type_index,
+                    .bootstrap_args = null,
+                } };
             },
             CpTag.Module => |_| {
                 const name_index = try cursor.readU2();

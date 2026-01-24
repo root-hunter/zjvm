@@ -12,13 +12,8 @@ const FieldInfoJSON = @import("fields.zig").FieldInfoJSON;
 const MethodInfo = @import("methods.zig").MethodInfo;
 const MethodInfoJSON = @import("methods.zig").MethodInfoJSON;
 
-pub const RefInfo = struct {
-    class_index: types.U2,
-    name_and_type_index: types.U2,
-};
-
-pub const FieldRefInfo = RefInfo;
-pub const MethodRefInfo = RefInfo;
+const FieldRefInfo = cp.FieldRefInfo;
+const MethodRefInfo = cp.MethodRefInfo;
 
 pub const ClassInfoJSON = struct {
     magic: types.U4,
@@ -340,6 +335,26 @@ pub const ClassInfo = struct {
         };
     }
 
+    pub fn getConstantString(self: *const ClassInfo, index: types.U2) ![]const u8 {
+        const cp_entry = try self.getConstant(index);
+        return switch (cp_entry) {
+            .String => |string_index| {
+                const string_cp = try self.getConstant(string_index);
+                return switch (string_cp) {
+                    .Utf8 => |str| str,
+                    else => {
+                        std.debug.print("Error: String entry at index {d} does not point to a Utf8 entry. Found: {s}\n", .{ string_index, @tagName(string_cp) });
+                        return error.InvalidConstantPoolEntry;
+                    },
+                };
+            },
+            else => {
+                std.debug.print("Error: Constant pool entry at index {d} is not a String entry. Found: {s}\n", .{ index, @tagName(cp_entry) });
+                return error.InvalidConstantPoolEntry;
+            },
+        };
+    }
+
     pub fn getConstantPoolEntry(
         self: *const ClassInfo,
         index: u16,
@@ -428,6 +443,31 @@ pub const ClassInfo = struct {
         } else {
             return null;
         }
+    }
+
+    pub fn getBootstrapMethod(self: *const ClassInfo, index: types.U2) !cp.InvokeDynamicRefInfo {
+        const cp_entry = try self.getConstant(index);
+        const invokedynamic = switch (cp_entry) {
+            .InvokeDynamic => |id| id,
+            else => return error.InvalidConstantPoolEntry,
+        };
+
+        // Cerca il BootstrapMethods attribute tra gli attributes
+        if (self.attributes) |attrs| {
+            for (attrs) |attr| {
+                if (attr.isBootstrapMethods()) {
+                    const bm_attr = try attr.getBootstrapMethods(self);
+                    if (invokedynamic.bootstrap_method_attr_index < bm_attr.len) {
+                        const attr_index: usize = @intCast(invokedynamic.bootstrap_method_attr_index);
+                        return bm_attr[attr_index];
+                    } else {
+                        return error.InvalidBootstrapMethodIndex;
+                    }
+                }
+            }
+        }
+
+        return error.BootstrapMethodsNotFound;
     }
 
     pub fn toJSON(self: *const ClassInfo) !ClassInfoJSON {

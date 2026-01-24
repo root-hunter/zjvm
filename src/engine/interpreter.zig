@@ -9,6 +9,7 @@ const AttributesInfo = @import("../classfile/attributes.zig").AttributesInfo;
 const ExceptionTableEntry = @import("../classfile/code.zig").ExceptionTableEntry;
 const MethodInfo = @import("../classfile/methods.zig").MethodInfo;
 const utils = @import("../classfile/utils.zig");
+const types = @import("../classfile/types.zig");
 
 const PrintStream = struct {
     stream: ?std.fs.File,
@@ -623,18 +624,21 @@ pub const JVMInterpreter = struct {
                         }
                     },
                     OpcodeEnum.InvokeDynamic => {
-                        // TODO handle invokedynamic
-                        const indexbyte1 = frame.getCodeByte(frame.pc + 1);
-                        const indexbyte2 = frame.getCodeByte(frame.pc + 2);
-                        const index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
+                        // --- LEGGO L'INDICE DALL'OPERANDO ---
+                        const index: u16 = (@as(u16, frame.getCodeByte(frame.pc + 1)) << 8) | @as(u16, frame.getCodeByte(frame.pc + 2));
 
+                        // --- COSTANTE CP ---
                         const entry = try frame.class.getConstantPoolEntry(index);
-
                         const indy = switch (entry) {
                             .InvokeDynamic => |i| i,
                             else => return error.InvalidConstantPoolEntry,
                         };
 
+                        // --- BOOTSTRAP METHOD ---
+                        const bootstrap = try frame.class.getBootstrapMethod(index);
+                        std.debug.print("Invokedynamic bootstrap method: {any}\n", .{bootstrap});
+
+                        // --- NAME AND TYPE ---
                         const nat_cp = try frame.class.getConstantPoolEntry(indy.name_and_type_index);
                         const nat = switch (nat_cp) {
                             .NameAndType => |nt| nt,
@@ -651,18 +655,26 @@ pub const JVMInterpreter = struct {
 
                         std.debug.print("Invokedynamic makeConcatWithConstants called with descriptor: {s}\n", .{descriptor});
 
-                        // --- PARSE PARAMS ---
-                        const param_count = 1;
+                        // --- LEGGO IL TEMPLATE DALLA BOOTSTRAP ARG[0] ---
+                        if (bootstrap.bootstrap_args == null or bootstrap.bootstrap_args.?.len == 0) {
+                            return error.InvalidBootstrapArgs;
+                        }
 
-                        // --- POP ARGOMENTI ---
+                        const template_idx = bootstrap.bootstrap_args.?[0];
+                        const template_str = try frame.class.getConstantString(template_idx);
+
+                        std.debug.print("  Template string: {s}\n", .{template_str});
+
+                        // --- PREPARO LISTA PARTI PER CONCAT ---
                         var parts = try std.ArrayList([]const u8).initCapacity(self.print_alloc, 10);
 
+                        // --- POP DEI PARAMETRI DALLA STACK ---
+                        const param_count: usize = utils.getParameterCount(descriptor);
                         std.debug.print("  Concatenating {d} parameters:\n", .{param_count});
 
                         var i: usize = 0;
                         while (i < param_count) : (i += 1) {
                             const v = try frame.operand_stack.pop();
-
                             switch (v) {
                                 .Int => |x| {
                                     const s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x});
@@ -678,17 +690,57 @@ pub const JVMInterpreter = struct {
                             }
                         }
 
-                        // --- CONCAT ---
+                        // --- AGGIUNGO I BOOTSTRAP_ARGS ---
+                        if (bootstrap.bootstrap_args) |args| {
+                            for (args) |arg_idx| {
+                                std.debug.print("Arg Idx: {d}\n", .{arg_idx});
+
+                                const cp_entry = try frame.class.getConstantPoolEntry(arg_idx);
+
+                                var str: []const u8 = &[_]u8{}; // placeholder iniziale
+
+                                switch (cp_entry) {
+                                    .Utf8 => |s| {
+                                        str = s;
+                                    },
+                                    .String => |str_idx| {
+                                        const str_cp = try frame.class.getConstantPoolEntry(str_idx);
+                                        str = switch (str_cp) {
+                                            .Utf8 => |s| s,
+                                            else => return error.InvalidConstantPoolEntry,
+                                        };
+                                    },
+                                    .Integer => |ii| {
+                                        str = try std.fmt.allocPrint(self.print_alloc, "{}", .{ii});
+                                    },
+                                    .Long => |ll| {
+                                        str = try std.fmt.allocPrint(self.print_alloc, "{}", .{ll});
+                                    },
+                                    .Float => |ff| {
+                                        str = try std.fmt.allocPrint(self.print_alloc, "{}", .{ff});
+                                    },
+                                    .Double => |dd| {
+                                        str = try std.fmt.allocPrint(self.print_alloc, "{}", .{dd});
+                                    },
+                                    else => return error.UnsupportedType,
+                                }
+
+                                try parts.append(self.print_alloc, str);
+                            }
+                        }
+
+                        // --- CONCATENAZIONE FINALE ---
                         var total_len: usize = 0;
                         for (parts.items) |p| total_len += p.len;
 
                         const buf = try allocator.alloc(u8, total_len);
                         var off: usize = 0;
                         for (parts.items) |p| {
-                            std.mem.copyBackwards(u8, buf[off..], p);
+                            std.mem.copyForwards(u8, buf[off .. off + p.len], p);
                             off += p.len;
                         }
 
+                        // --- CREO JAVA STRING ---
                         const js = try allocator.create(JavaString);
                         js.* = JavaString{ .bytes = buf };
 
