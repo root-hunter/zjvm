@@ -1,5 +1,28 @@
 const std = @import("std");
 const Value = @import("value.zig").Value;
+const ValueJSON = @import("value.zig").ValueJSON;
+
+pub const OperandStackJSON = struct {
+    data: []ValueJSON,
+    top: usize,
+    size: usize,
+
+    pub fn toJSON(stack: OperandStack) !OperandStackJSON {
+        const allocator = std.heap.page_allocator;
+        var data_json = try std.ArrayList(ValueJSON).initCapacity(allocator, stack.data.len);
+        defer data_json.deinit(allocator);
+
+        for (stack.data) |v| {
+            try data_json.append(allocator, try v.toJSON());
+        }
+
+        return OperandStackJSON{
+            .data = try data_json.toOwnedSlice(allocator),
+            .top = stack.top,
+            .size = stack.size,
+        };
+    }
+};
 
 pub const OperandStack = struct {
     data: []Value,
@@ -79,5 +102,9 @@ pub const OperandStack = struct {
             .Double => |d| d,
             else => error.TypeMismatch,
         };
+    }
+
+    pub fn toJSON(self: OperandStack) !OperandStackJSON {
+        return try OperandStackJSON.toJSON(self);
     }
 };

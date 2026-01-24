@@ -2,6 +2,16 @@ const std = @import("std");
 const s = @import("../runtime/jvm_stack.zig");
 const f = @import("../runtime/frame.zig");
 
+pub const ZJVMJSON = struct {
+    stack: s.JVMStackJSON,
+
+    pub fn toJSON(zjvm: ZJVM) !ZJVMJSON {
+        return ZJVMJSON{
+            .stack = try zjvm.stack.toJSON(),
+        };
+    }
+};
+
 pub const ZJVM = struct {
     stack: s.JVMStack,
 
@@ -21,5 +31,9 @@ pub const ZJVM = struct {
 
     pub fn currentFrame(self: *ZJVM) ?*f.Frame {
         return self.stack.current();
+    }
+
+    pub fn toJSON(self: ZJVM) !ZJVMJSON {
+        return try ZJVMJSON.toJSON(self);
     }
 };

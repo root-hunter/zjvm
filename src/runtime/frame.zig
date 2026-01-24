@@ -1,9 +1,31 @@
 const std = @import("std");
 const OperandStack = @import("operand_stack.zig").OperandStack;
+const OperandStackJSON = @import("operand_stack.zig").OperandStackJSON;
 const LocalVars = @import("local_vars.zig").LocalVars;
+const LocalVarsJSON = @import("local_vars.zig").LocalVarsJSON;
 const v = @import("value.zig");
 const ca = @import("../classfile/code.zig");
 const p = @import("../classfile/parser.zig");
+
+pub const FrameJSON = struct {
+    operand_stack: OperandStackJSON,
+    local_vars: LocalVarsJSON,
+    pc: usize,
+    code_length: usize,
+
+    // ZJVM adds
+    class_name: p.ClassInfoJSON,
+
+    pub fn init(frame: Frame) !FrameJSON {
+        return FrameJSON{
+            .operand_stack = try frame.operand_stack.toJSON(),
+            .local_vars = try frame.local_vars.toJSON(),
+            .pc = frame.pc,
+            .code_length = frame.getCodeLength(),
+            .class_name = try frame.class.toJSON(),
+        };
+    }
+};
 
 pub const Frame = struct {
     operand_stack: OperandStack,
@@ -77,5 +99,9 @@ pub const Frame = struct {
         std.debug.print("\nOperand Stack:\n", .{});
         std.debug.print("  Size: {d}/{d}\n", .{ self.operand_stack.top, self.operand_stack.data.len });
         std.debug.print("==================\n\n", .{});
+    }
+
+    pub fn toJSON(self: Frame) !FrameJSON {
+        return try FrameJSON.init(self);
     }
 };

@@ -1,3 +1,45 @@
+const std = @import("std");
+
+pub const ValueJSON = struct {
+    tag: []const u8,
+    value: ?[]const u8,
+
+    pub fn init(v: Value) !ValueJSON {
+        const allocator = std.heap.page_allocator;
+
+        return switch (v) {
+            .Int => ValueJSON{
+                .tag = "Int",
+                .value = try std.fmt.allocPrint(allocator, "{}", .{v.Int}),
+            },
+            .Float => ValueJSON{
+                .tag = "Float",
+                .value = try std.fmt.allocPrint(allocator, "{}", .{v.Float}),
+            },
+            .Long => ValueJSON{
+                .tag = "Long",
+                .value = try std.fmt.allocPrint(allocator, "{}", .{v.Long}),
+            },
+            .Double => ValueJSON{
+                .tag = "Double",
+                .value = try std.fmt.allocPrint(allocator, "{}", .{v.Double}),
+            },
+            .Reference => ValueJSON{
+                .tag = "Reference",
+                .value = try std.fmt.allocPrint(allocator, "{}", .{&v.Reference.?}),
+            },
+            .ArrayRef => ValueJSON{
+                .tag = "ArrayRef",
+                .value = null,
+            },
+            .Top => ValueJSON{
+                .tag = "Top",
+                .value = null,
+            },
+        };
+    }
+};
+
 pub const ValueTag = enum(u8) {
     Int = 1,
     Float = 2,
@@ -16,4 +58,8 @@ pub const Value = union(ValueTag) {
     Reference: ?*anyopaque,
     ArrayRef: ?*[]Value,
     Top: void,
+
+    pub fn toJSON(self: Value) !ValueJSON {
+        return try ValueJSON.init(self);
+    }
 };

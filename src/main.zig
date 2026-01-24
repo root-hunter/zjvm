@@ -36,17 +36,17 @@ pub fn main() !void {
 
     try classInfo.parse(&cursor);
 
+    const json_file_path = "export.json";
+
     var out = std.Io.Writer.Allocating.init(allocator);
     const writer = &out.writer;
     defer out.deinit();
 
     //try std.json.Stringify.value(.{ .id = 1, .name = "test" }, .{}, writer);
-    const obj = try classInfo.toJSON();
+    // const obj = try classInfo.toJSON();
 
-    try std.json.Stringify.value(obj, .{ .whitespace = .indent_2 }, writer);
-
-    const json_str = out.written();
-    std.debug.print("Class Info as JSON:\n{s}\n", .{json_str});
+    var json_file = try std.fs.cwd().createFile(json_file_path, .{ .truncate = true, .mode = 0o644 });
+    defer json_file.close();
 
     const mMain = try classInfo.getMethod("main");
 
@@ -65,6 +65,10 @@ pub fn main() !void {
             var interpreter = try JVMInterpreter.init(&vm);
             try interpreter.execute(&allocator);
             frame.dump();
+
+            try std.json.Stringify.value(try frame.toJSON(), .{ .whitespace = .indent_1, .emit_null_optional_fields = true }, writer);
+            const json_str = out.written();
+            try json_file.writeAll(json_str);
 
             std.debug.print("Execution of 'main' completed.\n", .{});
         } else {
