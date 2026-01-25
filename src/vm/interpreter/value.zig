@@ -62,4 +62,8 @@ pub const Value = union(ValueTag) {
     pub fn toJSON(self: Value) !ValueJSON {
         return try ValueJSON.init(self);
     }
+    
+    pub fn _void() Value {
+        return Value{ .Top = {} };
+    }
 };

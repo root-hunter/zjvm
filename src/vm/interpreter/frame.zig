@@ -32,7 +32,6 @@ pub const Frame = struct {
     operand_stack: OperandStack,
     local_vars: LocalVars,
     codeAttr: ?ca.CodeAttribute,
-    std_function: ?ca.StdFunction = null,
     pc: usize,
 
     // ZJVM adds
@@ -48,7 +47,6 @@ pub const Frame = struct {
             .local_vars = try LocalVars.init(allocator, codeAttr.max_locals),
             .codeAttr = codeAttr,
             .pc = 0,
-            .std_function = null,
             .class = class,
         };
     }

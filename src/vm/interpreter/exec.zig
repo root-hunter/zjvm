@@ -11,14 +11,10 @@ const MethodInfo = @import("../class/methods.zig").MethodInfo;
 const utils = @import("../../utils.zig");
 const types = @import("../types.zig");
 const Heap = @import("../heap/heap.zig").Heap;
-
-const PrintStream = struct {
-    stream: ?std.fs.File,
-};
-
-pub const JavaString = struct {
-    bytes: []const u8,
-};
+const registry = @import("../native/registry.zig");
+const PrintStream = @import("../native/java_lang.zig").PrintStream;
+const JavaString = @import("../native/java_lang.zig").JavaString;
+const JavaLang = @import("../native/java_lang.zig");
 
 pub const JVMInterpreter = struct {
     vm: *ZJVM,
@@ -26,15 +22,46 @@ pub const JVMInterpreter = struct {
     stdout: std.fs.File,
     stdin: std.fs.File,
 
+    nr: registry.NativeRegistry,
+
     heap: Heap,
 
+    pub fn getNativeEnv(self: *JVMInterpreter) registry.NativeEnv {
+        return registry.NativeEnv{
+            .heap = &self.heap,
+            .stdout = &self.stdout,
+        };
+    }
+
     pub fn init(vm: *ZJVM) !JVMInterpreter {
+        const allocator = std.heap.page_allocator;
+        const heap = Heap.init(allocator);
+
+        var nr = try registry.NativeRegistry.init(allocator);
+        try JavaLang.registerAll(&nr);
+
+        // const d = try allocator.alloc(Value, 1);
+        // const java_string = try allocator.create(JavaString);
+        // java_string.* = JavaString{
+        //     .bytes = "Hello from bootstrap native method!",
+        // };
+        // d[0] = Value{ .Reference = @ptrCast(java_string) };
+
+        // _ = bootstrap_method.?(
+        //     &env,
+        //     d,
+        // ) catch {
+        //     std.debug.print("Error: Could not invoke bootstrap native method java/io/PrintStream.println((I)V)\n", .{});
+        //     return error.MethodInvocationFailed;
+        // };
+
         return JVMInterpreter{
-            .print_alloc = std.heap.page_allocator,
+            .print_alloc = allocator,
             .vm = vm,
             .stdout = std.fs.File.stdout(),
             .stdin = std.fs.File.stdin(),
-            .heap = Heap.init(std.heap.page_allocator),
+            .heap = heap,
+            .nr = nr,
         };
     }
 
@@ -108,6 +135,21 @@ pub const JVMInterpreter = struct {
             return error.MethodNotFound;
         }
 
+        const method_class = try frame.class.getConstantUtf8(methodref.class_index);
+        const method_signature_entry = try frame.class.getConstant(methodref.name_and_type_index);
+        const nat = method_signature_entry.NameAndType;
+        const method_signature = try frame.class.getConstantUtf8(nat.descriptor_index);
+        const method_name = method.?.name;
+
+        // std.debug.print("Invoking {s} ({s}) from class {s}\n", .{ method.?.name, method_signature, method_class });
+
+        const bootstrap_method = self.nr.find(method_class, method_name, method_signature);
+
+        if (bootstrap_method == null) {
+            std.debug.print("Error: Method {s} with signature {s} not found in native registry.\n", .{ method_name, method_signature });
+            return error.MethodNotFound;
+        }
+
         const params = try method.?.getParameterTypes();
 
         if (params.len + 1 > frame.operand_stack.size) {
@@ -115,38 +157,33 @@ pub const JVMInterpreter = struct {
             return error.StackUnderflow;
         }
 
-        // const method_name = try frame.class.getConstantUtf8(method_index);
+        const np = method.?.num_params + 1;
 
-        if (!std.mem.eql(u8, method.?.name, "println")) {
-            std.debug.print("Error: Unsupported virtual method {s}\n", .{method.?.name});
-            return error.MethodNotFound;
+        var ne = self.getNativeEnv();
+        const args = self.print_alloc.alloc(Value, np) catch {
+            std.debug.print("Error: Out of memory while allocating arguments for method invocation.\n", .{});
+            return error.OutOfMemory;
+        };
+
+        var val: ?Value = null;
+
+        if (utils.is2SlotType(params[0].bytes)) {
+            val = try frame.pop2Operand();
         } else {
-            const std_function = StdFunction{
-                .func = .Println,
-                .method = method.?,
-            };
-
-            const is2Slots = utils.is2SlotType(params[0].bytes);
-
-            const num_params = method.?.num_params + 1;
-
-            //frame.pc += 1 + opcode.getOperandLength();
-
-            var new_frame = try Frame.initStdFunctionFrame(allocator, std_function, num_params, frame.class);
-
-            if (is2Slots) {
-                // Double takes two slots
-                try new_frame.pushOperand(try frame.popOperand());
-                // Top slot for double
-                try new_frame.pushOperand(try frame.popOperand());
-            } else {
-                try new_frame.pushOperand(try frame.popOperand());
-            }
-
-            // Then the object reference
-            try new_frame.pushOperand(try frame.popOperand());
-            try self.vm.pushFrame(new_frame);
+            val = try frame.popOperand();
         }
+
+        _ = try frame.popOperand(); // 'this' reference
+
+        args[0] = val.?;
+
+        _ = bootstrap_method.?(
+            &ne,
+            args,
+        ) catch {
+            std.debug.print("Error: Could not invoke native method {s} with signature {s}\n", .{ method_name, method_signature });
+            return error.MethodInvocationFailed;
+        };
     }
 
     fn invokeDynamic(self: *JVMInterpreter, allocator: *std.mem.Allocator, frame: *Frame) !void {
@@ -276,493 +313,425 @@ pub const JVMInterpreter = struct {
         try self.vm.pushFrame(new_frame);
     }
 
-    fn handleStdFunction(self: *JVMInterpreter, frame: *Frame) !void {
-        const std_func = frame.std_function.?;
-        const method = std_func.method;
-
-        switch (std_func.func) {
-            .Println => {
-                const ref: Value = try frame.popOperand();
-                const value: Value = try frame.popOperand();
-
-                const params = method.getParameterTypes() catch return error.InvalidMethodDescriptor;
-
-                const is2Slots = utils.is2SlotType(params[0].bytes);
-
-                if (is2Slots) {
-                    _ = try frame.popOperand(); // Top slot
-                }
-
-                const ps: *PrintStream = @ptrCast(@alignCast(ref.Reference));
-
-                if (ps.stream == null) {
-                    return error.NullPointerException;
-                }
-
-                const stream = ps.stream.?;
-
-                var value_str: ?[]const u8 = null;
-
-                switch (value) {
-                    .Int => |i| {
-                        value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{i}) catch return error.OutOfMemory;
-                    },
-                    .Float => |f| {
-                        value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{f}) catch return error.OutOfMemory;
-                    },
-                    .Double => |d| {
-                        value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{d}) catch return error.OutOfMemory;
-                    },
-                    .Long => |l| {
-                        value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{l}) catch return error.OutOfMemory;
-                    },
-                    .Reference => |r| {
-                        const js: *JavaString = @ptrCast(@alignCast(r));
-                        value_str = js.bytes;
-                    },
-                    else => {
-                        std.debug.print("Unsupported type for println: {any}\n", .{value});
-                    },
-                }
-                if (value_str) |vs| {
-                    _ = try stream.write(vs);
-                    _ = try stream.write("\n");
-                } else {
-                    return error.UnsupportedStdFunction;
-                }
-            },
-            else => {
-                return error.UnsupportedStdFunction;
-            },
-        }
-    }
-
     pub fn execute(self: *JVMInterpreter, allocator: *std.mem.Allocator) !void {
         while (true) {
             const frame = self.vm.currentFrame() orelse return error.NoFrame;
 
-            if (frame.std_function != null) {
-                try self.handleStdFunction(frame);
+            if (frame.pc >= frame.getCodeLength()) {
                 _ = try self.vm.popFrame();
                 if (self.vm.stack.top == 0) break;
                 continue;
-            } else {
-                if (frame.pc >= frame.getCodeLength()) {
-                    _ = try self.vm.popFrame();
+            }
+
+            const result = std.meta.intToEnum(OpcodeEnum, frame.getCodeByte(frame.pc));
+
+            if (result == error.InvalidEnumTag) {
+                std.debug.print("Invalid opcode 0x{x} at pc {d}\n", .{ frame.getCodeByte(frame.pc), frame.pc });
+                return error.InvalidOpcode;
+            }
+
+            const opcode: OpcodeEnum = @enumFromInt(frame.getCodeByte(frame.pc));
+
+            switch (opcode) {
+                .Nop => {
+                    // Do nothing
+                },
+                .FConts2 => try frame.pushOperand(Value{ .Float = 2.0 }),
+                .DConst0 => try frame.push2Operand(Value{ .Double = 0.0 }),
+                .IConstM1 => try frame.pushOperand(Value{ .Int = -1 }),
+                .IConst0 => try frame.pushOperand(Value{ .Int = 0 }),
+                .IConst1 => try frame.pushOperand(Value{ .Int = 1 }),
+                .IConst2 => try frame.pushOperand(Value{ .Int = 2 }),
+                .IConst3 => try frame.pushOperand(Value{ .Int = 3 }),
+                .IConst4 => try frame.pushOperand(Value{ .Int = 4 }),
+                .IConst5 => try frame.pushOperand(Value{ .Int = 5 }),
+                .BiPush => {
+                    const byte = frame.getCodeByte(frame.pc + 1); // il byte seguente
+                    const value: i32 = @intCast(byte); // bipush è signed 8-bit
+                    try frame.pushOperand(Value{ .Int = value });
+                },
+                .SiPush => {
+                    const high_byte = frame.getCodeByte(frame.pc + 1);
+                    const low_byte = frame.getCodeByte(frame.pc + 2);
+
+                    const high: i16 = @intCast(high_byte);
+                    const low: i16 = @intCast(low_byte);
+
+                    const combined: i16 = (high << 8) | low;
+                    const value: i32 = @intCast(combined);
+
+                    try frame.pushOperand(Value{ .Int = value });
+                },
+                .LDC => {
+                    const index_byte = frame.getCodeByte(frame.pc + 1);
+                    const index: u16 = @as(u16, index_byte);
+
+                    const entry = try frame.class.getConstantPoolEntry(index);
+
+                    switch (entry) {
+                        .Integer => |int_value| {
+                            try frame.pushOperand(Value{ .Int = int_value });
+                        },
+                        .Float => |float_value| {
+                            try frame.pushOperand(Value{ .Float = float_value });
+                        },
+                        .String => |string_index| {
+                            // For now, we will push the reference as a usize pointer
+
+                            const java_string = try allocator.create(JavaString);
+                            const str_bytes = try frame.class.getConstantUtf8(string_index);
+
+                            java_string.* = JavaString{
+                                .bytes = str_bytes,
+                            };
+
+                            try frame.pushOperand(Value{ .Reference = @ptrCast(@alignCast(java_string)) });
+                        },
+                        else => {
+                            return error.InvalidConstantType;
+                        },
+                    }
+                },
+                .LDC2_W => {
+                    const index_high = @as(u16, frame.getCodeByte(frame.pc + 1));
+                    const index_low = @as(u16, frame.getCodeByte(frame.pc + 2));
+
+                    const index: u16 = (index_high << 8) | index_low;
+
+                    const entry = try frame.class.getConstantPoolEntry(index);
+
+                    switch (entry) {
+                        .Long => |long_value| {
+                            try frame.push2Operand(Value{ .Long = long_value });
+                        },
+                        .Double => |double_value| {
+                            try frame.push2Operand(Value{ .Double = double_value });
+                        },
+                        else => {
+                            return error.InvalidConstantType;
+                        },
+                    }
+                },
+                .ILoad => { // iload
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                    try frame.pushLocalVarToStackVar(index);
+                },
+                .ILoad0 => try frame.pushLocalVarToStackVar(0),
+                .ILoad1 => try frame.pushLocalVarToStackVar(1),
+                .ILoad2 => try frame.pushLocalVarToStackVar(2),
+                .ILoad3 => try frame.pushLocalVarToStackVar(3),
+                .LLoad => { // lload
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                    try frame.pushLocalVarToStackVar(index);
+                },
+                .FLoad => { // fload
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                    try frame.pushLocalVarToStackVar(index);
+                },
+                .LLoad1 => try frame.pushLocalVarToStackVar(1),
+                .LLoad3 => try frame.pushLocalVarToStackVar(3),
+                .DLoad => { // dload
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                    try frame.pushLocalVarToStackVar(index);
+                },
+                .DLoad1 => try frame.pushLocalVarToStackVar(1),
+                .DLoad3 => try frame.pushLocalVarToStackVar(3),
+                .ALoad1 => try frame.pushLocalVarToStackVar(1),
+                .AALoad => { // aaload
+                    const index_value = try frame.popOperand();
+                    const arrayref_value = try frame.popOperand();
+
+                    const arrayref = arrayref_value.ArrayRef;
+
+                    if (arrayref == null) {
+                        return error.NullPointerException;
+                    }
+
+                    const index: usize = @intCast(index_value.Int);
+
+                    const element = arrayref.?.*[index];
+                    try frame.pushOperand(element);
+                },
+                .IStore => { // istore
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                    try frame.popStackVarToLocalVar(opcode, index);
+                },
+                .IStore0 => try frame.popStackVarToLocalVar(opcode, 0),
+                .IStore1 => try frame.popStackVarToLocalVar(opcode, 1),
+                .IStore2 => try frame.popStackVarToLocalVar(opcode, 2),
+                .IStore3 => try frame.popStackVarToLocalVar(opcode, 3),
+                .LStore => { // lstore
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                    try frame.popStackVarToLocalVar(opcode, index);
+                },
+                .FStore => { // fstore
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                    try frame.popStackVarToLocalVar(opcode, index);
+                },
+                .DStore => { // dstore
+                    const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                    try frame.popStackVarToLocalVar(opcode, index);
+                },
+                .DStore1 => try frame.popStackVarToLocalVar(opcode, 1),
+                .DStore3 => try frame.popStackVarToLocalVar(opcode, 3),
+                .LStore1 => try frame.popStackVarToLocalVar(opcode, 1),
+                .LStore3 => try frame.popStackVarToLocalVar(opcode, 3),
+                .AStore1 => try frame.popStackVarToLocalVar(opcode, 1),
+                .ISub => { // isub
+                    const b = (try frame.popOperand()).Int;
+                    const a = (try frame.popOperand()).Int;
+                    try frame.pushOperand(Value{ .Int = a - b });
+                },
+                .DSub => { // dsub
+                    const b = (try frame.pop2Operand()).Double;
+                    const a = (try frame.pop2Operand()).Double;
+                    try frame.push2Operand(Value{ .Double = a - b });
+                },
+                .IAdd => { // iadd
+                    const b = (try frame.popOperand()).Int;
+                    const a = (try frame.popOperand()).Int;
+                    try frame.pushOperand(Value{ .Int = a + b });
+                },
+                .LAdd => { // ladd
+                    const b = (try frame.pop2Operand()).Long;
+                    const a = (try frame.pop2Operand()).Long;
+                    try frame.push2Operand(Value{ .Long = a + b });
+                },
+                .FAdd => { // fadd
+                    const b = (try frame.popOperand()).Float;
+                    const a = (try frame.popOperand()).Float;
+                    try frame.pushOperand(Value{ .Float = a + b });
+                },
+                .DAdd => { // dadd
+                    const b = (try frame.pop2Operand()).Double;
+                    const a = (try frame.pop2Operand()).Double;
+                    try frame.push2Operand(Value{ .Double = a + b });
+                },
+                .IMul => { // imul
+                    const b = (try frame.popOperand()).Int;
+                    const a = (try frame.popOperand()).Int;
+                    try frame.pushOperand(Value{ .Int = a * b });
+                },
+                .LMul => { // lmul
+                    const b = (try frame.pop2Operand()).Long;
+                    const a = (try frame.pop2Operand()).Long;
+                    try frame.push2Operand(Value{ .Long = a * b });
+                },
+                .DMul => { // dmul
+                    const b = (try frame.pop2Operand()).Double;
+                    const a = (try frame.pop2Operand()).Double;
+                    try frame.push2Operand(Value{ .Double = a * b });
+                },
+                .IDiv => { // idiv
+                    const b = (try frame.popOperand()).Int;
+                    const a = (try frame.popOperand()).Int;
+                    if (b == 0) {
+                        return error.ArithmeticException;
+                    }
+                    try frame.pushOperand(Value{ .Int = @divFloor(a, b) });
+                },
+                .DDiv => { // ddiv
+                    const b = (try frame.pop2Operand()).Double;
+                    const a = (try frame.pop2Operand()).Double;
+                    if (b == 0.0) {
+                        return error.ArithmeticException;
+                    }
+                    try frame.push2Operand(Value{ .Double = a / b });
+                },
+                .IRem => { // irem
+                    const b = (try frame.popOperand()).Int;
+                    const a = (try frame.popOperand()).Int;
+                    if (b == 0) {
+                        return error.ArithmeticException;
+                    }
+                    try frame.pushOperand(Value{ .Int = @rem(a, b) });
+                },
+                .LxOr => { // lxor
+                    const value2 = try frame.pop2Operand();
+                    const value1 = try frame.pop2Operand();
+                    const r: i64 = value1.Long ^ value2.Long;
+
+                    try frame.push2Operand(Value{ .Long = r });
+                },
+                .IInc => { // iinc
+                    const index_byte = frame.getCodeByte(frame.pc + 1);
+                    const const_byte = frame.getCodeByte(frame.pc + 2);
+
+                    const index: usize = @intCast(index_byte);
+                    const increment: i32 = @intCast(const_byte);
+
+                    var current_value = frame.local_vars.vars[index].Int;
+                    current_value += increment;
+                    frame.local_vars.vars[index] = Value{ .Int = current_value };
+                },
+                .I2L => { // i2l
+                    const int_value = try frame.popOperand();
+                    const long_value: i64 = @intCast(int_value.Int);
+                    try frame.push2Operand(Value{ .Long = long_value });
+                },
+                .I2D => { // i2d
+                    const int_value = try frame.popOperand();
+                    const d_value: f64 = @floatFromInt(int_value.Int);
+                    try frame.push2Operand(Value{ .Double = d_value });
+                },
+                .D2I => {
+                    const d = (try frame.pop2Operand()).Double;
+
+                    const i: i32 =
+                        if (std.math.isNan(d)) 0 else if (d > @as(f64, std.math.maxInt(i32)))
+                            std.math.maxInt(i32)
+                        else if (d < @as(f64, std.math.minInt(i32)))
+                            std.math.minInt(i32)
+                        else
+                            @intFromFloat(d);
+
+                    try frame.pushOperand(Value{ .Int = i });
+                },
+                .IfNe => { // ifne
+                    const value = try frame.popOperand();
+
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
+
+                    const high: i16 = @intCast(offset_high);
+                    const low: i16 = @intCast(offset_low);
+
+                    const branch_offset: i16 = (high << 8) | low;
+
+                    if (value.Int != 0) {
+                        const b: i32 = @intCast(frame.pc);
+                        frame.pc = @intCast(b + branch_offset);
+                        continue;
+                    }
+                },
+                .IfICmpLt => { // if_icmplt
+                    const value2 = try frame.popOperand();
+                    const value1 = try frame.popOperand();
+
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
+
+                    const high: i16 = @intCast(offset_high);
+                    const low: i16 = @intCast(offset_low);
+
+                    const branch_offset: i16 = (high << 8) | low;
+
+                    if (value1.Int < value2.Int) {
+                        const b: i32 = @intCast(frame.pc);
+                        frame.pc = @intCast(b + branch_offset);
+                        continue;
+                    }
+                },
+                .IfICmpGe => { // if_icmpge
+                    const value2 = try frame.popOperand();
+                    const value1 = try frame.popOperand();
+
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
+
+                    const high: i16 = @intCast(offset_high);
+                    const low: i16 = @intCast(offset_low);
+
+                    const branch_offset: i16 = (high << 8) | low;
+
+                    if (value1.Int >= value2.Int) {
+                        const b: i32 = @intCast(frame.pc);
+                        frame.pc = @intCast(b + branch_offset);
+                        continue;
+                    }
+                },
+                .IfICmpGt => { // if_icmpgt
+                    const value2 = try frame.popOperand();
+                    const value1 = try frame.popOperand();
+
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
+
+                    const high: i16 = @intCast(offset_high);
+                    const low: i16 = @intCast(offset_low);
+
+                    const branch_offset: i16 = (high << 8) | low;
+
+                    if (value1.Int > value2.Int) {
+                        const b: i32 = @intCast(frame.pc);
+                        frame.pc = @intCast(b + branch_offset);
+                        continue;
+                    }
+                },
+                .IfICmpLe => { // if_icmple
+                    const value2 = try frame.popOperand();
+                    const value1 = try frame.popOperand();
+
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
+
+                    const high: i16 = @intCast(offset_high);
+                    const low: i16 = @intCast(offset_low);
+
+                    const branch_offset: i16 = (high << 8) | low;
+
+                    if (value1.Int <= value2.Int) {
+                        const b: i32 = @intCast(frame.pc);
+                        frame.pc = @intCast(b + branch_offset);
+                        continue;
+                    }
+                },
+                .GoTo => {
+                    const offset_high = frame.getCodeByte(frame.pc + 1);
+                    const offset_low = frame.getCodeByte(frame.pc + 2);
+
+                    const branch_offset: i16 =
+                        (@as(i16, offset_high) << 8) | @as(i16, offset_low);
+
+                    const pc_i32: i32 = @intCast(frame.pc);
+                    frame.pc = @intCast(pc_i32 + branch_offset);
+                    continue;
+                },
+                .IReturn => {
+                    const return_value = try frame.popOperand();
+
+                    _ = try self.vm.stack.pop();
+
+                    if (self.vm.stack.top == 0) {
+                        break;
+                    }
+
+                    var caller = self.vm.stack.current();
+                    try caller.pushOperand(return_value);
+
+                    continue;
+                },
+                .Return => { // return
+                    _ = try self.vm.stack.pop();
                     if (self.vm.stack.top == 0) break;
                     continue;
-                }
+                },
+                .GetStatic => try self.getStatic(allocator, frame),
+                .InvokeStatic => try self.invokeStatic(allocator, frame),
+                .InvokeVirtual => try self.invokeVirtual(allocator, frame),
+                .InvokeDynamic => try self.invokeDynamic(allocator, frame),
+                .New => {
+                    const index_high = frame.getCodeByte(frame.pc + 1);
+                    const index_low = frame.getCodeByte(frame.pc + 2);
 
-                const result = std.meta.intToEnum(OpcodeEnum, frame.getCodeByte(frame.pc));
+                    const index: u16 =
+                        (@as(u16, index_high) << 8) | @as(u16, index_low);
 
-                if (result == error.InvalidEnumTag) {
-                    std.debug.print("Invalid opcode 0x{x} at pc {d}\n", .{ frame.getCodeByte(frame.pc), frame.pc });
-                    return error.InvalidOpcode;
-                }
+                    const class_cp = try frame.class.getConstantPoolEntry(index);
+                    const class_index = switch (class_cp) {
+                        .Class => |c| c,
+                        else => return error.InvalidConstantPoolEntry,
+                    };
+                    const class_name = try frame.class.getConstantUtf8(class_index);
 
-                const opcode: OpcodeEnum = @enumFromInt(frame.getCodeByte(frame.pc));
+                    std.debug.print("Creating new object of class {s} (not implemented yet)\n", .{class_name});
 
-                switch (opcode) {
-                    .Nop => {
-                        // Do nothing
-                    },
-                    .FConts2 => try frame.pushOperand(Value{ .Float = 2.0 }),
-                    .DConst0 => try frame.push2Operand(Value{ .Double = 0.0 }),
-                    .IConstM1 => try frame.pushOperand(Value{ .Int = -1 }),
-                    .IConst0 => try frame.pushOperand(Value{ .Int = 0 }),
-                    .IConst1 => try frame.pushOperand(Value{ .Int = 1 }),
-                    .IConst2 => try frame.pushOperand(Value{ .Int = 2 }),
-                    .IConst3 => try frame.pushOperand(Value{ .Int = 3 }),
-                    .IConst4 => try frame.pushOperand(Value{ .Int = 4 }),
-                    .IConst5 => try frame.pushOperand(Value{ .Int = 5 }),
-                    .BiPush => {
-                        const byte = frame.getCodeByte(frame.pc + 1); // il byte seguente
-                        const value: i32 = @intCast(byte); // bipush è signed 8-bit
-                        try frame.pushOperand(Value{ .Int = value });
-                    },
-                    .SiPush => {
-                        const high_byte = frame.getCodeByte(frame.pc + 1);
-                        const low_byte = frame.getCodeByte(frame.pc + 2);
-
-                        const high: i16 = @intCast(high_byte);
-                        const low: i16 = @intCast(low_byte);
-
-                        const combined: i16 = (high << 8) | low;
-                        const value: i32 = @intCast(combined);
-
-                        try frame.pushOperand(Value{ .Int = value });
-                    },
-                    .LDC => {
-                        const index_byte = frame.getCodeByte(frame.pc + 1);
-                        const index: u16 = @as(u16, index_byte);
-
-                        const entry = try frame.class.getConstantPoolEntry(index);
-
-                        switch (entry) {
-                            .Integer => |int_value| {
-                                try frame.pushOperand(Value{ .Int = int_value });
-                            },
-                            .Float => |float_value| {
-                                try frame.pushOperand(Value{ .Float = float_value });
-                            },
-                            .String => |string_index| {
-                                // For now, we will push the reference as a usize pointer
-
-                                const java_string = try allocator.create(JavaString);
-                                const str_bytes = try frame.class.getConstantUtf8(string_index);
-
-                                java_string.* = JavaString{
-                                    .bytes = str_bytes,
-                                };
-
-                                try frame.pushOperand(Value{ .Reference = @ptrCast(@alignCast(java_string)) });
-                            },
-                            else => {
-                                return error.InvalidConstantType;
-                            },
-                        }
-                    },
-                    .LDC2_W => {
-                        const index_high = @as(u16, frame.getCodeByte(frame.pc + 1));
-                        const index_low = @as(u16, frame.getCodeByte(frame.pc + 2));
-
-                        const index: u16 = (index_high << 8) | index_low;
-
-                        const entry = try frame.class.getConstantPoolEntry(index);
-
-                        switch (entry) {
-                            .Long => |long_value| {
-                                try frame.push2Operand(Value{ .Long = long_value });
-                            },
-                            .Double => |double_value| {
-                                try frame.push2Operand(Value{ .Double = double_value });
-                            },
-                            else => {
-                                return error.InvalidConstantType;
-                            },
-                        }
-                    },
-                    .ILoad => { // iload
-                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        try frame.pushLocalVarToStackVar(index);
-                    },
-                    .ILoad0 => try frame.pushLocalVarToStackVar(0),
-                    .ILoad1 => try frame.pushLocalVarToStackVar(1),
-                    .ILoad2 => try frame.pushLocalVarToStackVar(2),
-                    .ILoad3 => try frame.pushLocalVarToStackVar(3),
-                    .LLoad => { // lload
-                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        try frame.pushLocalVarToStackVar(index);
-                    },
-                    .FLoad => { // fload
-                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        try frame.pushLocalVarToStackVar(index);
-                    },
-                    .LLoad1 => try frame.pushLocalVarToStackVar(1),
-                    .LLoad3 => try frame.pushLocalVarToStackVar(3),
-                    .DLoad => { // dload
-                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        try frame.pushLocalVarToStackVar(index);
-                    },
-                    .DLoad1 => try frame.pushLocalVarToStackVar(1),
-                    .DLoad3 => try frame.pushLocalVarToStackVar(3),
-                    .ALoad1 => try frame.pushLocalVarToStackVar(1),
-                    .AALoad => { // aaload
-                        const index_value = try frame.popOperand();
-                        const arrayref_value = try frame.popOperand();
-
-                        const arrayref = arrayref_value.ArrayRef;
-
-                        if (arrayref == null) {
-                            return error.NullPointerException;
-                        }
-
-                        const index: usize = @intCast(index_value.Int);
-
-                        const element = arrayref.?.*[index];
-                        try frame.pushOperand(element);
-                    },
-                    .IStore => { // istore
-                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        try frame.popStackVarToLocalVar(opcode, index);
-                    },
-                    .IStore0 => try frame.popStackVarToLocalVar(opcode, 0),
-                    .IStore1 => try frame.popStackVarToLocalVar(opcode, 1),
-                    .IStore2 => try frame.popStackVarToLocalVar(opcode, 2),
-                    .IStore3 => try frame.popStackVarToLocalVar(opcode, 3),
-                    .LStore => { // lstore
-                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        try frame.popStackVarToLocalVar(opcode, index);
-                    },
-                    .FStore => { // fstore
-                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        try frame.popStackVarToLocalVar(opcode, index);
-                    },
-                    .DStore => { // dstore
-                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        try frame.popStackVarToLocalVar(opcode, index);
-                    },
-                    .DStore1 => try frame.popStackVarToLocalVar(opcode, 1),
-                    .DStore3 => try frame.popStackVarToLocalVar(opcode, 3),
-                    .LStore1 => try frame.popStackVarToLocalVar(opcode, 1),
-                    .LStore3 => try frame.popStackVarToLocalVar(opcode, 3),
-                    .AStore1 => try frame.popStackVarToLocalVar(opcode, 1),
-                    .ISub => { // isub
-                        const b = (try frame.popOperand()).Int;
-                        const a = (try frame.popOperand()).Int;
-                        try frame.pushOperand(Value{ .Int = a - b });
-                    },
-                    .DSub => { // dsub
-                        const b = (try frame.pop2Operand()).Double;
-                        const a = (try frame.pop2Operand()).Double;
-                        try frame.push2Operand(Value{ .Double = a - b });
-                    },
-                    .IAdd => { // iadd
-                        const b = (try frame.popOperand()).Int;
-                        const a = (try frame.popOperand()).Int;
-                        try frame.pushOperand(Value{ .Int = a + b });
-                    },
-                    .LAdd => { // ladd
-                        const b = (try frame.pop2Operand()).Long;
-                        const a = (try frame.pop2Operand()).Long;
-                        try frame.push2Operand(Value{ .Long = a + b });
-                    },
-                    .FAdd => { // fadd
-                        const b = (try frame.popOperand()).Float;
-                        const a = (try frame.popOperand()).Float;
-                        try frame.pushOperand(Value{ .Float = a + b });
-                    },
-                    .DAdd => { // dadd
-                        const b = (try frame.pop2Operand()).Double;
-                        const a = (try frame.pop2Operand()).Double;
-                        try frame.push2Operand(Value{ .Double = a + b });
-                    },
-                    .IMul => { // imul
-                        const b = (try frame.popOperand()).Int;
-                        const a = (try frame.popOperand()).Int;
-                        try frame.pushOperand(Value{ .Int = a * b });
-                    },
-                    .LMul => { // lmul
-                        const b = (try frame.pop2Operand()).Long;
-                        const a = (try frame.pop2Operand()).Long;
-                        try frame.push2Operand(Value{ .Long = a * b });
-                    },
-                    .DMul => { // dmul
-                        const b = (try frame.pop2Operand()).Double;
-                        const a = (try frame.pop2Operand()).Double;
-                        try frame.push2Operand(Value{ .Double = a * b });
-                    },
-                    .IDiv => { // idiv
-                        const b = (try frame.popOperand()).Int;
-                        const a = (try frame.popOperand()).Int;
-                        if (b == 0) {
-                            return error.ArithmeticException;
-                        }
-                        try frame.pushOperand(Value{ .Int = @divFloor(a, b) });
-                    },
-                    .DDiv => { // ddiv
-                        const b = (try frame.pop2Operand()).Double;
-                        const a = (try frame.pop2Operand()).Double;
-                        if (b == 0.0) {
-                            return error.ArithmeticException;
-                        }
-                        try frame.push2Operand(Value{ .Double = a / b });
-                    },
-                    .IRem => { // irem
-                        const b = (try frame.popOperand()).Int;
-                        const a = (try frame.popOperand()).Int;
-                        if (b == 0) {
-                            return error.ArithmeticException;
-                        }
-                        try frame.pushOperand(Value{ .Int = @rem(a, b) });
-                    },
-                    .LxOr => { // lxor
-                        const value2 = try frame.pop2Operand();
-                        const value1 = try frame.pop2Operand();
-                        const r: i64 = value1.Long ^ value2.Long;
-
-                        try frame.push2Operand(Value{ .Long = r });
-                    },
-                    .IInc => { // iinc
-                        const index_byte = frame.getCodeByte(frame.pc + 1);
-                        const const_byte = frame.getCodeByte(frame.pc + 2);
-
-                        const index: usize = @intCast(index_byte);
-                        const increment: i32 = @intCast(const_byte);
-
-                        var current_value = frame.local_vars.vars[index].Int;
-                        current_value += increment;
-                        frame.local_vars.vars[index] = Value{ .Int = current_value };
-                    },
-                    .I2L => { // i2l
-                        const int_value = try frame.popOperand();
-                        const long_value: i64 = @intCast(int_value.Int);
-                        try frame.push2Operand(Value{ .Long = long_value });
-                    },
-                    .I2D => { // i2d
-                        const int_value = try frame.popOperand();
-                        const d_value: f64 = @floatFromInt(int_value.Int);
-                        try frame.push2Operand(Value{ .Double = d_value });
-                    },
-                    .D2I => {
-                        const d = (try frame.pop2Operand()).Double;
-
-                        const i: i32 =
-                            if (std.math.isNan(d)) 0 else if (d > @as(f64, std.math.maxInt(i32)))
-                                std.math.maxInt(i32)
-                            else if (d < @as(f64, std.math.minInt(i32)))
-                                std.math.minInt(i32)
-                            else
-                                @intFromFloat(d);
-
-                        try frame.pushOperand(Value{ .Int = i });
-                    },
-                    .IfNe => { // ifne
-                        const value = try frame.popOperand();
-
-                        const offset_high = frame.getCodeByte(frame.pc + 1);
-                        const offset_low = frame.getCodeByte(frame.pc + 2);
-
-                        const high: i16 = @intCast(offset_high);
-                        const low: i16 = @intCast(offset_low);
-
-                        const branch_offset: i16 = (high << 8) | low;
-
-                        if (value.Int != 0) {
-                            const b: i32 = @intCast(frame.pc);
-                            frame.pc = @intCast(b + branch_offset);
-                            continue;
-                        }
-                    },
-                    .IfICmpLt => { // if_icmplt
-                        const value2 = try frame.popOperand();
-                        const value1 = try frame.popOperand();
-
-                        const offset_high = frame.getCodeByte(frame.pc + 1);
-                        const offset_low = frame.getCodeByte(frame.pc + 2);
-
-                        const high: i16 = @intCast(offset_high);
-                        const low: i16 = @intCast(offset_low);
-
-                        const branch_offset: i16 = (high << 8) | low;
-
-                        if (value1.Int < value2.Int) {
-                            const b: i32 = @intCast(frame.pc);
-                            frame.pc = @intCast(b + branch_offset);
-                            continue;
-                        }
-                    },
-                    .IfICmpGe => { // if_icmpge
-                        const value2 = try frame.popOperand();
-                        const value1 = try frame.popOperand();
-
-                        const offset_high = frame.getCodeByte(frame.pc + 1);
-                        const offset_low = frame.getCodeByte(frame.pc + 2);
-
-                        const high: i16 = @intCast(offset_high);
-                        const low: i16 = @intCast(offset_low);
-
-                        const branch_offset: i16 = (high << 8) | low;
-
-                        if (value1.Int >= value2.Int) {
-                            const b: i32 = @intCast(frame.pc);
-                            frame.pc = @intCast(b + branch_offset);
-                            continue;
-                        }
-                    },
-                    .IfICmpGt => { // if_icmpgt
-                        const value2 = try frame.popOperand();
-                        const value1 = try frame.popOperand();
-
-                        const offset_high = frame.getCodeByte(frame.pc + 1);
-                        const offset_low = frame.getCodeByte(frame.pc + 2);
-
-                        const high: i16 = @intCast(offset_high);
-                        const low: i16 = @intCast(offset_low);
-
-                        const branch_offset: i16 = (high << 8) | low;
-
-                        if (value1.Int > value2.Int) {
-                            const b: i32 = @intCast(frame.pc);
-                            frame.pc = @intCast(b + branch_offset);
-                            continue;
-                        }
-                    },
-                    .IfICmpLe => { // if_icmple
-                        const value2 = try frame.popOperand();
-                        const value1 = try frame.popOperand();
-
-                        const offset_high = frame.getCodeByte(frame.pc + 1);
-                        const offset_low = frame.getCodeByte(frame.pc + 2);
-
-                        const high: i16 = @intCast(offset_high);
-                        const low: i16 = @intCast(offset_low);
-
-                        const branch_offset: i16 = (high << 8) | low;
-
-                        if (value1.Int <= value2.Int) {
-                            const b: i32 = @intCast(frame.pc);
-                            frame.pc = @intCast(b + branch_offset);
-                            continue;
-                        }
-                    },
-                    .GoTo => {
-                        const offset_high = frame.getCodeByte(frame.pc + 1);
-                        const offset_low = frame.getCodeByte(frame.pc + 2);
-
-                        const branch_offset: i16 =
-                            (@as(i16, offset_high) << 8) | @as(i16, offset_low);
-
-                        const pc_i32: i32 = @intCast(frame.pc);
-                        frame.pc = @intCast(pc_i32 + branch_offset);
-                        continue;
-                    },
-                    .IReturn => {
-                        const return_value = try frame.popOperand();
-
-                        _ = try self.vm.stack.pop();
-
-                        if (self.vm.stack.top == 0) {
-                            break;
-                        }
-
-                        var caller = self.vm.stack.current();
-                        try caller.pushOperand(return_value);
-
-                        continue;
-                    },
-                    .Return => { // return
-                        _ = try self.vm.stack.pop();
-                        if (self.vm.stack.top == 0) break;
-                        continue;
-                    },
-                    .GetStatic => try self.getStatic(allocator, frame),
-                    .InvokeStatic => try self.invokeStatic(allocator, frame),
-                    .InvokeVirtual => try self.invokeVirtual(allocator, frame),
-                    .InvokeDynamic => try self.invokeDynamic(allocator, frame),
-                    .New => {
-                        const index_high = frame.getCodeByte(frame.pc + 1);
-                        const index_low = frame.getCodeByte(frame.pc + 2);
-
-                        const index: u16 =
-                            (@as(u16, index_high) << 8) | @as(u16, index_low);
-
-                        const class_cp = try frame.class.getConstantPoolEntry(index);
-                        const class_index = switch (class_cp) {
-                            .Class => |c| c,
-                            else => return error.InvalidConstantPoolEntry,
-                        };
-                        const class_name = try frame.class.getConstantUtf8(class_index);
-
-                        std.debug.print("Creating new object of class {s} (not implemented yet)\n", .{class_name});
-
-                        //const new_object = try self.heap.allocateObject(class_name);
-                        //try frame.pushOperand(Value{ .Reference = @ptrCast(@alignCast(new_object)) });
-                    },
-                }
-
-                frame.pc += 1 + opcode.getOperandLength();
+                    //const new_object = try self.heap.allocateObject(class_name);
+                    //try frame.pushOperand(Value{ .Reference = @ptrCast(@alignCast(new_object)) });
+                },
             }
+
+            frame.pc += 1 + opcode.getOperandLength();
         }
         return;
     }
