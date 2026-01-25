@@ -285,10 +285,9 @@ test "ZJVM Test Suite 12 Stdout Tests" {
     try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
 }
 
-fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Value) !i.JVMInterpreter {
+fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Value, logFilePath: []const u8) !i.JVMInterpreter {
     var gpa = std.heap.DebugAllocator(.{}){};
     var allocator = gpa.allocator();
-    const logFilePath = "samples/outputs/test_suite_13.log";
     const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
     defer logFile.close();
 
@@ -379,9 +378,10 @@ test "ZJVM Test Suite 13 Long and Float Arithmetic" {
         .{ .Double = 0.3 },
         .{ .Top = {} },
     };
+    const logFilePath = "samples/outputs/test_suite_13.log";
     const filePath = "samples/TestSuite13.class";
 
-    _ = try makeTestDoubleArithmetic(filePath, &expectedValues);
+    _ = try makeTestDoubleArithmetic(filePath, &expectedValues, logFilePath);
 }
 
 // Import all test files to include them in the test suite
