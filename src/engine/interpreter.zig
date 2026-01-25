@@ -442,14 +442,18 @@ pub const JVMInterpreter = struct {
                         const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
                         try frame.pushLocalVarToStackVar(index);
                     },
-                    .FLoad => { // fload
-                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        try frame.pushLocalVarToStackVar(index);
-                    },
                     .ILoad0 => try frame.pushLocalVarToStackVar(0),
                     .ILoad1 => try frame.pushLocalVarToStackVar(1),
                     .ILoad2 => try frame.pushLocalVarToStackVar(2),
                     .ILoad3 => try frame.pushLocalVarToStackVar(3),
+                    .LLoad => { // lload
+                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                        try frame.pushLocalVarToStackVar(index);
+                    },
+                    .FLoad => { // fload
+                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                        try frame.pushLocalVarToStackVar(index);
+                    },
                     .LLoad1 => try frame.pushLocalVarToStackVar(1),
                     .LLoad3 => try frame.pushLocalVarToStackVar(3),
                     .DLoad => { // dload
@@ -475,59 +479,30 @@ pub const JVMInterpreter = struct {
                         try frame.pushOperand(element);
                     },
                     .IStore => { // istore
-                        const index_byte = frame.getCodeByte(frame.pc + 1);
-                        const index: usize = @intCast(index_byte);
-                        const value = try frame.popOperand();
-                        frame.local_vars.vars[index] = value;
+                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                        try frame.popStackVarToLocalVar(opcode, index);
+                    },
+                    .IStore0 => try frame.popStackVarToLocalVar(opcode, 0),
+                    .IStore1 => try frame.popStackVarToLocalVar(opcode, 1),
+                    .IStore2 => try frame.popStackVarToLocalVar(opcode, 2),
+                    .IStore3 => try frame.popStackVarToLocalVar(opcode, 3),
+                    .LStore => { // lstore
+                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                        try frame.popStackVarToLocalVar(opcode, index);
                     },
                     .FStore => { // fstore
-                        const index_byte = frame.getCodeByte(frame.pc + 1);
-                        const index: usize = @intCast(index_byte);
-                        const value = try frame.popOperand();
-                        frame.local_vars.vars[index] = value;
-                    },
-                    .IStore0 => { // istore_0
-                        const value = try frame.popOperand();
-                        frame.local_vars.vars[0] = value;
-                    },
-                    .IStore1 => { // istore_1
-                        const value = try frame.popOperand();
-                        frame.local_vars.vars[1] = value;
-                    },
-                    .IStore2 => { // istore_2
-                        const value = try frame.popOperand();
-                        frame.local_vars.vars[2] = value;
-                    },
-                    .IStore3 => { // istore_3
-                        const value = try frame.popOperand();
-                        frame.local_vars.vars[3] = value;
+                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                        try frame.popStackVarToLocalVar(opcode, index);
                     },
                     .DStore => { // dstore
                         const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
                         try frame.popStackVarToLocalVar(opcode, index);
                     },
-                    .LStore1 => { // lstore_1
-                        const value = try frame.pop2Operand();
-                        frame.local_vars.vars[1] = value;
-                        frame.local_vars.vars[2] = Value.Top;
-                    },
-                    .LStore3 => { // lstore_3
-                        const value = try frame.pop2Operand();
-                        frame.local_vars.vars[3] = value;
-                        frame.local_vars.vars[4] = Value.Top;
-                    },
-                    .DStore1 => { // dstore_1
-                        const value = try frame.pop2Operand();
-                        frame.local_vars.vars[1] = value;
-                    },
-                    .DStore3 => { // dstore_3
-                        const value = try frame.pop2Operand();
-                        frame.local_vars.vars[3] = value;
-                    },
-                    .AStore1 => { // astore_1
-                        const value = try frame.popOperand();
-                        frame.local_vars.vars[1] = value;
-                    },
+                    .DStore1 => try frame.popStackVarToLocalVar(opcode, 1),
+                    .DStore3 => try frame.popStackVarToLocalVar(opcode, 3),
+                    .LStore1 => try frame.popStackVarToLocalVar(opcode, 1),
+                    .LStore3 => try frame.popStackVarToLocalVar(opcode, 3),
+                    .AStore1 => try frame.popStackVarToLocalVar(opcode, 1),
                     .ISub => { // isub
                         const b = (try frame.popOperand()).Int;
                         const a = (try frame.popOperand()).Int;
@@ -542,6 +517,11 @@ pub const JVMInterpreter = struct {
                         const b = (try frame.popOperand()).Int;
                         const a = (try frame.popOperand()).Int;
                         try frame.pushOperand(Value{ .Int = a + b });
+                    },
+                    .LAdd => { // ladd
+                        const b = (try frame.pop2Operand()).Long;
+                        const a = (try frame.pop2Operand()).Long;
+                        try frame.push2Operand(Value{ .Long = a + b });
                     },
                     .FAdd => { // fadd
                         const b = (try frame.popOperand()).Float;
@@ -609,6 +589,11 @@ pub const JVMInterpreter = struct {
                         var current_value = frame.local_vars.vars[index].Int;
                         current_value += increment;
                         frame.local_vars.vars[index] = Value{ .Int = current_value };
+                    },
+                    .I2L => { // i2l
+                        const int_value = try frame.popOperand();
+                        const long_value: i64 = @intCast(int_value.Int);
+                        try frame.push2Operand(Value{ .Long = long_value });
                     },
                     .I2D => { // i2d
                         const int_value = try frame.popOperand();
@@ -717,7 +702,6 @@ pub const JVMInterpreter = struct {
                             continue;
                         }
                     },
-                    .InvokeStatic => try self.invokeStatic(allocator, frame),
                     .GoTo => {
                         const offset_high = frame.getCodeByte(frame.pc + 1);
                         const offset_low = frame.getCodeByte(frame.pc + 2);
@@ -749,6 +733,7 @@ pub const JVMInterpreter = struct {
                         continue;
                     },
                     .GetStatic => try self.getStatic(allocator, frame),
+                    .InvokeStatic => try self.invokeStatic(allocator, frame),
                     .InvokeVirtual => try self.invokeVirtual(allocator, frame),
                     .InvokeDynamic => try self.invokeDynamic(allocator, frame),
                 }

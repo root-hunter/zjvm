@@ -111,7 +111,7 @@ pub const Frame = struct {
 
     pub fn popStackVarToLocalVar(self: *Frame, opcode: OpcodeEnum, index: usize) !void {
         // TODO Add LSTORE
-        if (opcode == OpcodeEnum.DStore) {
+        if (opcode == OpcodeEnum.DStore or opcode == OpcodeEnum.DStore1 or opcode == OpcodeEnum.DStore3 or opcode == OpcodeEnum.LStore or opcode == OpcodeEnum.LStore1 or opcode == OpcodeEnum.LStore3) {
             const value = try self.pop2Operand();
             self.local_vars.vars[index] = value;
             self.local_vars.vars[index + 1] = v.Value.Top;
