@@ -1,4 +1,4 @@
-const types = @import("types.zig");
+const types = @import("../types.zig");
 
 pub const ClassAccessFlags = enum(types.U2) {
     Public = 0x0001,

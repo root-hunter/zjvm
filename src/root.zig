@@ -1,11 +1,11 @@
 const std = @import("std");
 
-const utils = @import("classfile/utils.zig");
-const parser = @import("classfile/parser.zig");
-const fr = @import("runtime/frame.zig");
-const i = @import("engine/interpreter.zig");
-const v = @import("runtime/value.zig");
-const ZJVM = @import("engine/vm.zig").ZJVM;
+const utils = @import("utils.zig");
+const parser = @import("vm/class/parser.zig");
+const fr = @import("vm/interpreter/frame.zig");
+const i = @import("vm/interpreter/exec.zig");
+const v = @import("vm/interpreter/value.zig");
+const ZJVM = @import("vm/vm.zig").ZJVM;
 
 const testing = std.testing;
 
@@ -382,12 +382,4 @@ test "ZJVM Test Suite 13 Long and Float Arithmetic" {
     const filePath = "examples/tests/TestSuite13.class";
 
     _ = try makeTestDoubleArithmetic(filePath, &expectedValues, logFilePath);
-}
-
-// Import all test files to include them in the test suite
-test {
-    _ = @import("runtime/value_test.zig");
-    _ = @import("runtime/operand_stack_test.zig");
-    _ = @import("runtime/local_vars_test.zig");
-    _ = @import("engine/opcode_test.zig");
 }

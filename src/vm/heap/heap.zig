@@ -1,6 +1,6 @@
 const std = @import("std");
 const Object = @import("object.zig").Object;
-const parser = @import("../classfile/parser.zig");
+const parser = @import("../class/parser.zig");
 
 pub const Heap = struct {
     allocator: std.mem.Allocator,

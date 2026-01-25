@@ -1,6 +1,6 @@
 const std = @import("std");
-const s = @import("../runtime/jvm_stack.zig");
-const f = @import("../runtime/frame.zig");
+const s = @import("interpreter/jvm_stack.zig");
+const f = @import("interpreter/frame.zig");
 
 pub const ZJVMJSON = struct {
     stack: s.JVMStackJSON,

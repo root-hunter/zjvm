@@ -1,9 +1,9 @@
 const std = @import("std");
-const types = @import("types.zig");
-const Cursor = @import("utils.zig").Cursor;
+const types = @import("../types.zig");
+const Cursor = @import("../../utils.zig").Cursor;
 const AttributesInfo = @import("attributes.zig").AttributesInfo;
 const p = @import("parser.zig");
-const o = @import("../engine/opcode.zig");
+const o = @import("../interpreter/opcode.zig");
 const m = @import("methods.zig");
 
 pub const StdFunctionKind = enum(u8) {

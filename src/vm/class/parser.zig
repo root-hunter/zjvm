@@ -1,8 +1,8 @@
 const std = @import("std");
-const types = @import("types.zig");
+const types = @import("../types.zig");
 const cp = @import("constant_pool.zig");
 const ac = @import("access_flags.zig");
-const utils = @import("utils.zig");
+const utils = @import("../../utils.zig");
 
 const AttributesInfo = @import("attributes.zig").AttributesInfo;
 const AttributesInfoJSON = @import("attributes.zig").AttributesInfoJSON;

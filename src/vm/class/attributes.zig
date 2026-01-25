@@ -1,7 +1,7 @@
 const std = @import("std");
-const types = @import("types.zig");
+const types = @import("../types.zig");
 const cp = @import("constant_pool.zig");
-const utils = @import("utils.zig");
+const utils = @import("../../utils.zig");
 const CodeAttribute = @import("code.zig").CodeAttribute;
 const p = @import("parser.zig");
 

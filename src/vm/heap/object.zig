@@ -1,5 +1,5 @@
 const std = @import("std");
-const parser = @import("../classfile/parser.zig");
+const parser = @import("../class/parser.zig");
 
 pub const Object = struct {
     classInfo: *parser.ClassInfo,

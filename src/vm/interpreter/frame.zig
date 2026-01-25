@@ -4,9 +4,9 @@ const OperandStackJSON = @import("operand_stack.zig").OperandStackJSON;
 const LocalVars = @import("local_vars.zig").LocalVars;
 const LocalVarsJSON = @import("local_vars.zig").LocalVarsJSON;
 const v = @import("value.zig");
-const ca = @import("../classfile/code.zig");
-const p = @import("../classfile/parser.zig");
-const OpcodeEnum = @import("../engine/opcode.zig").OpcodeEnum;
+const ca = @import("../class//code.zig");
+const p = @import("../class/parser.zig");
+const OpcodeEnum = @import("../interpreter/opcode.zig").OpcodeEnum;
 
 pub const FrameJSON = struct {
     operand_stack: OperandStackJSON,

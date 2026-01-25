@@ -1,12 +1,11 @@
 const std = @import("std");
-const parser = @import("classfile/parser.zig");
-const ac = @import("classfile/access_flags.zig");
-const utils = @import("classfile/utils.zig");
+const parser = @import("vm/class//parser.zig");
+const ac = @import("vm/class/access_flags.zig");
+const utils = @import("utils.zig");
 
-const fr = @import("runtime/frame.zig");
-
-const JVMInterpreter = @import("engine/interpreter.zig").JVMInterpreter;
-const ZJVM = @import("engine/vm.zig").ZJVM;
+const fr = @import("vm/interpreter/frame.zig");
+const JVMInterpreter = @import("vm/interpreter/exec.zig").JVMInterpreter;
+const ZJVM = @import("vm/vm.zig").ZJVM;
 
 pub fn main() !void {
     var allocator = std.heap.page_allocator;

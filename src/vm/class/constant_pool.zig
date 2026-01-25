@@ -1,6 +1,6 @@
 const std = @import("std");
-const types = @import("types.zig");
-const utils = @import("utils.zig");
+const types = @import("../types.zig");
+const utils = @import("../../utils.zig");
 
 pub const RefInfo = struct {
     class_index: types.U2,

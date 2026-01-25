@@ -1,16 +1,16 @@
 const std = @import("std");
-const Frame = @import("../runtime/frame.zig").Frame;
-const Value = @import("../runtime/value.zig").Value;
+const Frame = @import("frame.zig").Frame;
+const Value = @import("value.zig").Value;
 const OpcodeEnum = @import("opcode.zig").OpcodeEnum;
-const ZJVM = @import("../engine/vm.zig").ZJVM;
-const Code = @import("../classfile/code.zig").CodeAttribute;
-const StdFunction = @import("../classfile/code.zig").StdFunction;
-const AttributesInfo = @import("../classfile/attributes.zig").AttributesInfo;
-const ExceptionTableEntry = @import("../classfile/code.zig").ExceptionTableEntry;
-const MethodInfo = @import("../classfile/methods.zig").MethodInfo;
-const utils = @import("../classfile/utils.zig");
-const types = @import("../classfile/types.zig");
-const Heap = @import("heap.zig").Heap;
+const ZJVM = @import("../vm.zig").ZJVM;
+const Code = @import("../class/code.zig").CodeAttribute;
+const StdFunction = @import("../class/code.zig").StdFunction;
+const AttributesInfo = @import("../class/attributes.zig").AttributesInfo;
+const ExceptionTableEntry = @import("../class/code.zig").ExceptionTableEntry;
+const MethodInfo = @import("../class/methods.zig").MethodInfo;
+const utils = @import("../../utils.zig");
+const types = @import("../types.zig");
+const Heap = @import("../heap/heap.zig").Heap;
 
 const PrintStream = struct {
     stream: ?std.fs.File,

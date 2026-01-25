@@ -1,6 +1,6 @@
 const std = @import("std");
-const types = @import("types.zig");
-const AttributesInfo = @import("attributes.zig").AttributesInfo;
+const types = @import("vm/types.zig");
+const AttributesInfo = @import("vm/class/attributes.zig").AttributesInfo;
 
 pub const Cursor = struct {
     buffer: []const u8,
