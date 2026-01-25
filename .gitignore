@@ -1,6 +1,6 @@
 /zig-out
 /.zig-cache
-/samples/*.class
 /logs
-/samples/outputs/*.log
+/examples/*.class
+/examples/outputs/*.log
 /debug

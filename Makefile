@@ -10,7 +10,7 @@ build-debug:
 
 build-samples:
 	@echo "Building sample Java class files..."
-	javac samples/*.java
+	javac examples/tests/*.java
 	@echo "Sample Java class files build complete."
 
 build:

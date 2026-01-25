@@ -18,5 +18,10 @@ public class TestSuite14 {
       System.out.println("Double Value: " + doubleVar); // Double Value: 0.1
       double doubleResult = doubleVar + 0.2;
       System.out.println("Double Result (doubleVar + 0.2): " + doubleResult); // Double Result (doubleVar + 0.2): 0.3
+
+      for (int i = 0; i < 500000; i++) {
+         long loopLong = longVar + i;
+         // System.out.println("Loop " + i + ": " + loopLong);
+      }
    }
 }

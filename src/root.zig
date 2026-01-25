@@ -71,7 +71,7 @@ fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: 
     const mMain = try classInfo.getMethod("main");
     var vm = try ZJVM.init(&allocator, 1024);
 
-    const res = std.fs.cwd().makeDir("samples/outputs");
+    const res = std.fs.cwd().makeDir("examples/outputs");
 
     if (res != error.PathAlreadyExists) {
         try res;
@@ -122,7 +122,7 @@ test "ZJVM Test Suite 1" {
         .{ .Int = 403 },
         .{ .Int = 799 },
     };
-    const filePath = "samples/TestSuite1.class";
+    const filePath = "examples/tests/TestSuite1.class";
 
     _ = try makeTestSuite(filePath, &expectedValues);
 }
@@ -135,7 +135,7 @@ test "ZJVM Test Suite 2" {
         .{ .Int = 50 },
         .{ .Int = 80 },
     };
-    const filePath = "samples/TestSuite2.class";
+    const filePath = "examples/tests/TestSuite2.class";
     _ = try makeTestSuite(filePath, &expectedValues);
 }
 
@@ -148,7 +148,7 @@ test "ZJVM Test Suite 3" {
         .{ .Int = 32 },
         .{ .Int = 0 },
     };
-    const filePath = "samples/TestSuite3.class";
+    const filePath = "examples/tests/TestSuite3.class";
     _ = try makeTestSuite(filePath, &expectedValues);
 }
 
@@ -163,7 +163,7 @@ test "ZJVM Test Suite 4" {
         .{ .Int = 500 },
         .{ .Int = 24100 },
     };
-    const filePath = "samples/TestSuite4.class";
+    const filePath = "examples/tests/TestSuite4.class";
     _ = try makeTestSuite(filePath, &expectedValues);
 }
 
@@ -174,7 +174,7 @@ test "ZJVM Test Suite 5" {
         .{ .Int = 4 },
         .{ .Int = 20736 },
     };
-    const filePath = "samples/TestSuite5.class";
+    const filePath = "examples/tests/TestSuite5.class";
     _ = try makeTestSuite(filePath, &expectedValues);
 }
 
@@ -186,7 +186,7 @@ test "ZJVM Test Suite 6" {
         .{ .Int = 50135000 },
         .{ .Int = 5013 },
     };
-    const filePath = "samples/TestSuite6.class";
+    const filePath = "examples/tests/TestSuite6.class";
     _ = try makeTestSuite(filePath, &expectedValues);
 }
 
@@ -198,7 +198,7 @@ test "ZJVM Test Suite 7" {
         .{ .Int = 830 },
         .{ .Int = 41 },
     };
-    const filePath = "samples/TestSuite7.class";
+    const filePath = "examples/tests/TestSuite7.class";
     _ = try makeTestSuite(filePath, &expectedValues);
 }
 
@@ -214,7 +214,7 @@ test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
         .{ .Int = 20 },
         .{ .Int = 6765 },
     };
-    const filePath = "samples/TestSuite8.class";
+    const filePath = "examples/tests/TestSuite8.class";
     _ = try makeTestSuite(filePath, &expectedValues);
 }
 
@@ -235,29 +235,29 @@ test "ZJVM Test Suite 9 Double Arithmetic" {
         .{ .Double = 5 },
         .{ .Top = {} },
     };
-    const filePath = "samples/TestSuite9.class";
+    const filePath = "examples/tests/TestSuite9.class";
     _ = try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 10 Stdout Tests" {
-    const filePath = "samples/TestSuite10.class";
-    const logFilePath = "samples/outputs/test_suite_10.log";
+    const filePath = "examples/tests/TestSuite10.class";
+    const logFilePath = "examples/outputs/test_suite_10.log";
     const expectedLines = [_][]const u8{ "1024", "Hello, World! My name is ZJVM.", "This is Test Suite 10.", "12.12", "34.56", "7890123456", "1", "90" };
 
     try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
 }
 
 test "ZJVM Test Suite 11 Stdout Tests" {
-    const filePath = "samples/TestSuite11.class";
-    const logFilePath = "samples/outputs/test_suite_11.log";
+    const filePath = "examples/tests/TestSuite11.class";
+    const logFilePath = "examples/outputs/test_suite_11.log";
     const expectedLines = [_][]const u8{ "Hello, World! My name is ZJVM.", "1024", "1048576", "This is Test Suite 11.", "C = 1024", "D = 1048576 bytes( 1 MB )", "E = 3.14" };
 
     try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
 }
 
 test "ZJVM Test Suite 12 Stdout Tests" {
-    const filePath = "samples/TestSuite12.class";
-    const logFilePath = "samples/outputs/test_suite_12.log";
+    const filePath = "examples/tests/TestSuite12.class";
+    const logFilePath = "examples/outputs/test_suite_12.log";
     const expectedLines = [_][]const u8{
         "This is Test Suite 12.",
         "X = 42",
@@ -378,8 +378,8 @@ test "ZJVM Test Suite 13 Long and Float Arithmetic" {
         .{ .Double = 0.3 },
         .{ .Top = {} },
     };
-    const logFilePath = "samples/outputs/test_suite_13.log";
-    const filePath = "samples/TestSuite13.class";
+    const logFilePath = "examples/outputs/test_suite_13.log";
+    const filePath = "examples/tests/TestSuite13.class";
 
     _ = try makeTestDoubleArithmetic(filePath, &expectedValues, logFilePath);
 }

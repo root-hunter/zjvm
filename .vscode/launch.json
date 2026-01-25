@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceRoot}/zig-out/zjvm-debug",
             "args": [
-                "${workspaceRoot}/samples/TestSuite11.class"
+                "${workspaceRoot}/examples/tests/TestSuite11.class"
             ],
             "cwd": "${workspaceRoot}",
             "preLaunchTask": "make build-debug"

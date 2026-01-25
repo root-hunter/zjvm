@@ -42,7 +42,7 @@ jobs:
             
             - name: Build Java samples
               run: |
-                  javac samples/*.java
+                  javac examples/tests/*.java
                   
             - name: Run tests
               run: zig build test
