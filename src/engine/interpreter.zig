@@ -272,69 +272,73 @@ pub const JVMInterpreter = struct {
         try self.vm.pushFrame(new_frame);
     }
 
+    fn handleStdFunction(self: *JVMInterpreter, frame: *Frame) !void {
+        const std_func = frame.std_function.?;
+        const method = std_func.method;
+
+        switch (std_func.func) {
+            .Println => {
+                const ref: Value = try frame.popOperand();
+                const value: Value = try frame.popOperand();
+
+                const params = method.getParameterTypes() catch return error.InvalidMethodDescriptor;
+
+                const is2Slots = utils.is2SlotType(params[0].bytes);
+
+                if (is2Slots) {
+                    _ = try frame.popOperand(); // Top slot
+                }
+
+                const ps: *PrintStream = @ptrCast(@alignCast(ref.Reference));
+
+                if (ps.stream == null) {
+                    return error.NullPointerException;
+                }
+
+                const stream = ps.stream.?;
+
+                var value_str: ?[]const u8 = null;
+
+                switch (value) {
+                    .Int => |i| {
+                        value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{i}) catch return error.OutOfMemory;
+                    },
+                    .Float => |f| {
+                        value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{f}) catch return error.OutOfMemory;
+                    },
+                    .Double => |d| {
+                        value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{d}) catch return error.OutOfMemory;
+                    },
+                    .Long => |l| {
+                        value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{l}) catch return error.OutOfMemory;
+                    },
+                    .Reference => |r| {
+                        const js: *JavaString = @ptrCast(@alignCast(r));
+                        value_str = js.bytes;
+                    },
+                    else => {
+                        std.debug.print("Unsupported type for println: {any}\n", .{value});
+                    },
+                }
+                if (value_str) |vs| {
+                    _ = try stream.write(vs);
+                    _ = try stream.write("\n");
+                } else {
+                    return error.UnsupportedStdFunction;
+                }
+            },
+            else => {
+                return error.UnsupportedStdFunction;
+            },
+        }
+    }
+
     pub fn execute(self: *JVMInterpreter, allocator: *std.mem.Allocator) !void {
         while (true) {
             const frame = self.vm.currentFrame() orelse return error.NoFrame;
 
             if (frame.std_function != null) {
-                const std_func = frame.std_function.?;
-                const method = std_func.method;
-
-                switch (std_func.func) {
-                    .Println => {
-                        const ref: Value = try frame.popOperand();
-                        const value: Value = try frame.popOperand();
-
-                        const params = method.getParameterTypes() catch return error.InvalidMethodDescriptor;
-
-                        const is2Slots = utils.is2SlotType(params[0].bytes);
-
-                        if (is2Slots) {
-                            _ = try frame.popOperand(); // Top slot
-                        }
-
-                        const ps: *PrintStream = @ptrCast(@alignCast(ref.Reference));
-
-                        if (ps.stream == null) {
-                            return error.NullPointerException;
-                        }
-
-                        const stream = ps.stream.?;
-
-                        var value_str: ?[]const u8 = null;
-
-                        switch (value) {
-                            .Int => |i| {
-                                value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{i}) catch return error.OutOfMemory;
-                            },
-                            .Float => |f| {
-                                value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{f}) catch return error.OutOfMemory;
-                            },
-                            .Double => |d| {
-                                value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{d}) catch return error.OutOfMemory;
-                            },
-                            .Long => |l| {
-                                value_str = std.fmt.allocPrint(self.print_alloc, "{}", .{l}) catch return error.OutOfMemory;
-                            },
-                            .Reference => |r| {
-                                const js: *JavaString = @ptrCast(@alignCast(r));
-                                value_str = js.bytes;
-                            },
-                            else => {
-                                std.debug.print("Unsupported type for println: {any}\n", .{value});
-                            },
-                        }
-                        if (value_str) |vs| {
-                            _ = try stream.write(vs);
-                            _ = try stream.write("\n");
-                        } else {
-                            return error.UnsupportedStdFunction;
-                        }
-                    },
-                    else => {
-                        return error.UnsupportedStdFunction;
-                    },
-                }
+                try self.handleStdFunction(frame);
                 _ = try self.vm.popFrame();
                 if (self.vm.stack.top == 0) break;
                 continue;
