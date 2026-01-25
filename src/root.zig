@@ -10,7 +10,8 @@ const ZJVM = @import("engine/vm.zig").ZJVM;
 const testing = std.testing;
 
 fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !i.JVMInterpreter {
-    var allocator = std.heap.page_allocator;
+    var gpa = std.heap.DebugAllocator(.{}){};
+    var allocator = gpa.allocator();
 
     var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
     defer file.close();
@@ -51,7 +52,8 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !i.JVMIn
 }
 
 fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: []const []const u8) !void {
-    var allocator = std.heap.page_allocator;
+    var gpa = std.heap.DebugAllocator(.{}){};
+    var allocator = gpa.allocator();
 
     var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
     defer file.close();
@@ -284,7 +286,11 @@ test "ZJVM Test Suite 12 Stdout Tests" {
 }
 
 fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Value) !i.JVMInterpreter {
-    var allocator = std.heap.page_allocator;
+    var gpa = std.heap.DebugAllocator(.{}){};
+    var allocator = gpa.allocator();
+    const logFilePath = "samples/outputs/test_suite_13.log";
+    const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
+    defer logFile.close();
 
     var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
     defer file.close();
@@ -307,6 +313,7 @@ fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Valu
             var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
             var interpreter = try i.JVMInterpreter.init(&vm);
+            interpreter.setStdout(logFile);
             try interpreter.execute(&allocator);
 
             try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
@@ -318,10 +325,10 @@ fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Valu
             while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
                 switch (expectedValues[index]) {
                     .Top => {
-                        const excepted = expectedValues[index].Top;
+                        const expected = expectedValues[index].Top;
                         const actual = frame.local_vars.get(index).Top;
 
-                        try testing.expectEqual(excepted, actual);
+                        try testing.expectEqual(expected, actual);
                     },
                     .Int => {
                         const expected = expectedValues[index].Int;
@@ -374,10 +381,7 @@ test "ZJVM Test Suite 13 Long and Float Arithmetic" {
     };
     const filePath = "samples/TestSuite13.class";
 
-    _ = expectedValues;
-    _ = filePath;
-
-    //_ = try makeTestDoubleArithmetic(filePath, &expectedValues);
+    _ = try makeTestDoubleArithmetic(filePath, &expectedValues);
 }
 
 // Import all test files to include them in the test suite
