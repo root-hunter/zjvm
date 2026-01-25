@@ -205,65 +205,26 @@ pub const JVMInterpreter = struct {
                         }
                     },
                     OpcodeEnum.ILoad => { // iload
-                        const index_byte = frame.getCodeByte(frame.pc + 1);
-                        const index: usize = @intCast(index_byte);
-                        const value = frame.local_vars.vars[index];
-                        try frame.pushOperand(value);
+                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                        try frame.pushLocalVarToStackVar(index);
                     },
                     OpcodeEnum.FLoad => { // fload
-                        const index_byte = frame.getCodeByte(frame.pc + 1);
-                        const index: usize = @intCast(index_byte);
-                        const value = frame.local_vars.vars[index];
-                        try frame.pushOperand(value);
+                        const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
+                        try frame.pushLocalVarToStackVar(index);
                     },
-                    OpcodeEnum.ILoad0 => { // iload_0
-                        const value = frame.local_vars.vars[0];
-                        try frame.pushOperand(value);
-                    },
-                    OpcodeEnum.ILoad1 => { // iload_1
-                        const value = frame.local_vars.vars[1];
-                        try frame.pushOperand(value);
-                    },
-                    OpcodeEnum.ILoad2 => { // iload_2
-                        const value = frame.local_vars.vars[2];
-                        try frame.pushOperand(value);
-                    },
-                    OpcodeEnum.ILoad3 => { // iload_3
-                        const value = frame.local_vars.vars[3];
-                        try frame.pushOperand(value);
-                    },
-                    OpcodeEnum.LLoad1 => { // lload_1
-                        const value = frame.local_vars.vars[1];
-                        try frame.push2Operand(Value{ .Long = value.Long });
-                    },
-                    OpcodeEnum.LLoad3 => { // lload_3
-                        const value = frame.local_vars.vars[3];
-                        try frame.push2Operand(Value{ .Long = value.Long });
-                    },
+                    OpcodeEnum.ILoad0 => try frame.pushLocalVarToStackVar(0),
+                    OpcodeEnum.ILoad1 => try frame.pushLocalVarToStackVar(1),
+                    OpcodeEnum.ILoad2 => try frame.pushLocalVarToStackVar(2),
+                    OpcodeEnum.ILoad3 => try frame.pushLocalVarToStackVar(3),
+                    OpcodeEnum.LLoad1 => try frame.pushLocalVarToStackVar(1),
+                    OpcodeEnum.LLoad3 => try frame.pushLocalVarToStackVar(3),
                     OpcodeEnum.DLoad => { // dload
                         const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        const v = frame.local_vars.vars[index];
-
-                        switch (v) {
-                            .Double => |d| {
-                                // skip Top slot implicitly
-                                try frame.operand_stack.pushDouble(d);
-                            },
-                            else => return error.TypeMismatch,
-                        }
+                        try frame.pushLocalVarToStackVar(index);
                     },
-                    OpcodeEnum.DLoad1 => { // dload_1
-                        const value = frame.local_vars.vars[1];
-                        try frame.push2Operand(Value{ .Double = value.Double });
-                    },
-                    OpcodeEnum.DLoad3 => { // dload_3
-                        const value = frame.local_vars.vars[3];
-                        try frame.push2Operand(Value{ .Double = value.Double });
-                    },
-                    OpcodeEnum.ALoad1 => { // aload_1
-                        const value = frame.local_vars.vars[1];
-                        try frame.pushOperand(value);
-                    },
+                    OpcodeEnum.DLoad1 => try frame.pushLocalVarToStackVar(1),
+                    OpcodeEnum.DLoad3 => try frame.pushLocalVarToStackVar(3),
+                    OpcodeEnum.ALoad1 => try frame.pushLocalVarToStackVar(1),
                     OpcodeEnum.AALoad => { // aaload
                         const index_value = try frame.popOperand();
                         const arrayref_value = try frame.popOperand();
@@ -309,10 +270,7 @@ pub const JVMInterpreter = struct {
                     },
                     OpcodeEnum.DStore => { // dstore
                         const index: usize = @intCast(frame.getCodeByte(frame.pc + 1));
-                        const v = try frame.pop2Operand();
-
-                        frame.local_vars.vars[index] = v;
-                        frame.local_vars.vars[index + 1] = Value.Top;
+                        try frame.popStackVarToLocalVar(opcode, index);
                     },
                     OpcodeEnum.LStore1 => { // lstore_1
                         const value = try frame.pop2Operand();

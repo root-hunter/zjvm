@@ -6,6 +6,7 @@ const LocalVarsJSON = @import("local_vars.zig").LocalVarsJSON;
 const v = @import("value.zig");
 const ca = @import("../classfile/code.zig");
 const p = @import("../classfile/parser.zig");
+const OpcodeEnum = @import("../engine/opcode.zig").OpcodeEnum;
 
 pub const FrameJSON = struct {
     operand_stack: OperandStackJSON,
@@ -90,6 +91,34 @@ pub const Frame = struct {
 
     pub fn pop2Operand(self: *Frame) !v.Value {
         return try self.operand_stack.pop2Value();
+    }
+
+    pub fn pushLocalVarToStackVar(self: *Frame, index: usize) !void {
+        const value = self.local_vars.vars[index];
+
+        switch (value) {
+            .Double => {
+                try self.push2Operand(value);
+            },
+            .Long => {
+                try self.push2Operand(value);
+            },
+            else => {
+                try self.pushOperand(value);
+            },
+        }
+    }
+
+    pub fn popStackVarToLocalVar(self: *Frame, opcode: OpcodeEnum, index: usize) !void {
+        // TODO Add LSTORE
+        if (opcode == OpcodeEnum.DStore) {
+            const value = try self.pop2Operand();
+            self.local_vars.vars[index] = value;
+            self.local_vars.vars[index + 1] = v.Value.Top;
+        } else {
+            const value = try self.popOperand();
+            self.local_vars.vars[index] = value;
+        }
     }
 
     /// Dump function to print all local variables in the frame
