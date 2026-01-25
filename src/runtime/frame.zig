@@ -76,6 +76,22 @@ pub const Frame = struct {
         return self.codeAttr.?.getByte(index);
     }
 
+    pub fn pushOperand(self: *Frame, value: v.Value) !void {
+        try self.operand_stack.push(value);
+    }
+
+    pub fn popOperand(self: *Frame) !v.Value {
+        return try self.operand_stack.pop();
+    }
+
+    pub fn push2Operand(self: *Frame, value: v.Value) !void {
+        try self.operand_stack.push2Value(value);
+    }
+
+    pub fn pop2Operand(self: *Frame) !v.Value {
+        return try self.operand_stack.pop2Value();
+    }
+
     /// Dump function to print all local variables in the frame
     pub fn dump(self: *const Frame) void {
         std.debug.print("\n=== Frame Dump ===\n", .{});
