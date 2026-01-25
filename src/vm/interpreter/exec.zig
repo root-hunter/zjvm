@@ -40,21 +40,6 @@ pub const JVMInterpreter = struct {
         var nr = try registry.NativeRegistry.init(allocator);
         try JavaLang.registerAll(&nr);
 
-        // const d = try allocator.alloc(Value, 1);
-        // const java_string = try allocator.create(JavaString);
-        // java_string.* = JavaString{
-        //     .bytes = "Hello from bootstrap native method!",
-        // };
-        // d[0] = Value{ .Reference = @ptrCast(java_string) };
-
-        // _ = bootstrap_method.?(
-        //     &env,
-        //     d,
-        // ) catch {
-        //     std.debug.print("Error: Could not invoke bootstrap native method java/io/PrintStream.println((I)V)\n", .{});
-        //     return error.MethodInvocationFailed;
-        // };
-
         return JVMInterpreter{
             .print_alloc = allocator,
             .vm = vm,
