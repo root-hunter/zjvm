@@ -62,14 +62,14 @@ pub const Cursor = struct {
 
         while (self.position < self.buffer.len) : (self.position += 1) {
             if (self.buffer[self.position] == delimiter) {
-                const line = self.buffer[start .. self.position];
+                const line = self.buffer[start..self.position];
                 self.position += 1; // Skip the delimiter
                 return line;
             }
         }
 
         // If we reach here, we hit EOF
-        const line = self.buffer[start .. self.position];
+        const line = self.buffer[start..self.position];
         return line;
     }
 };
@@ -112,7 +112,6 @@ pub fn countMethodParameters(descriptor: []const u8) !usize {
 
     return count;
 }
-
 
 pub fn getMethodParameterTypes(descriptor: []const u8) ![]types.Utf8Info {
     const allocator = std.heap.page_allocator;
