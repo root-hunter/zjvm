@@ -165,23 +165,25 @@ pub const JVMInterpreter = struct {
             return error.OutOfMemory;
         };
 
-        var val: ?Value = null;
+        var i: usize = 0;
 
-        if (utils.is2SlotType(params[0].bytes)) {
-            val = try frame.pop2Operand();
-        } else {
-            val = try frame.popOperand();
+        while (i < np) : (i += 1) {
+            var val: ?Value = null;
+
+            if (utils.is2SlotType(params[0].bytes)) {
+                val = try frame.pop2Operand();
+            } else {
+                val = try frame.popOperand();
+            }
+
+            args[np - 1 - i] = val.?;
         }
-
-        _ = try frame.popOperand(); // 'this' reference
-
-        args[0] = val.?;
 
         _ = bootstrap_method.?(
             &ne,
             args,
         ) catch {
-            std.debug.print("Error: Could not invoke native method {s} with signature {s}\n", .{ method_name, method_signature });
+            std.debug.print("Error: Could not invoke native method {s} with signature {s} from class {s}\n", .{ method_name, method_signature, method_class });
             return error.MethodInvocationFailed;
         };
     }

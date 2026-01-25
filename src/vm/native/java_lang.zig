@@ -64,11 +64,11 @@ pub fn registerAll(nr: *registry.NativeRegistry) !void {
 fn println(env: *registry.NativeEnv, args: ?[]Value) !Value {
     const allocator = std.heap.page_allocator;
 
-    if (args == null) {
+    if (args == null or args.?.len != 2) {
         return error.InvalidArguments;
     }
 
-    const value = args.?[0];
+    const value = args.?[1];
 
     var value_str: ?[]const u8 = null;
 
