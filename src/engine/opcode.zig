@@ -75,29 +75,29 @@ pub const OpcodeEnum = enum(u8) {
 
     pub fn getOperandLength(self: OpcodeEnum) usize {
         return switch (self) {
-            OpcodeEnum.BiPush => 2, // 1 byte operand
-            OpcodeEnum.SiPush => 3, // 2 byte operand
-            OpcodeEnum.LDC => 2, // 1 byte operand
-            OpcodeEnum.LDC2_W => 3, // 2 byte operand
-            OpcodeEnum.IStore => 2, // istore <index>
-            OpcodeEnum.FStore => 2, // fstore <index>
-            OpcodeEnum.ILoad => 2, // iload <index>
-            OpcodeEnum.FLoad => 2, // fload <index>
-            OpcodeEnum.DLoad => 2, // dload <index>
-            OpcodeEnum.DStore => 2, // dstore <index>
-            OpcodeEnum.LxOr => 3, // lxor <indexbyte1> <indexbyte2>
-            OpcodeEnum.IInc => 3, // iinc <index> <const>
-            OpcodeEnum.IfNe => 3, // ifne <branchbyte1> <branchbyte2>
-            OpcodeEnum.IfICmpLt => 3, // if_icmplt <branchbyte1> <branchbyte2>
-            OpcodeEnum.IfICmpGe => 3, // if_icmpge <branchbyte1> <branchbyte2>
-            OpcodeEnum.IfICmpGt => 3, // if_icmpgt <branchbyte1> <branchbyte2>
-            OpcodeEnum.IfICmpLe => 3, // if_icmple <branchbyte1> <branchbyte2>
-            OpcodeEnum.GoTo => 3, // goto <branchbyte1> <branchbyte2>
-            OpcodeEnum.InvokeStatic => 3, // invokestatic <indexbyte1> <indexbyte2>
-            OpcodeEnum.GetStatic => 3, // getstatic <indexbyte1> <indexbyte2>
-            OpcodeEnum.InvokeVirtual => 3, // invokevirtual <indexbyte1> <indexbyte2>
-            OpcodeEnum.InvokeDynamic => 5, // invokedynamic <indexbyte1> <indexbyte2> 0 0
-            else => 1, // nessun operand
+            OpcodeEnum.BiPush => 1, // 1 byte operand
+            OpcodeEnum.SiPush => 2, // 2 byte operand
+            OpcodeEnum.LDC => 1, // 1 byte operand
+            OpcodeEnum.LDC2_W => 2, // 2 byte operand
+            OpcodeEnum.IStore => 1, // istore <index>
+            OpcodeEnum.FStore => 1, // fstore <index>
+            OpcodeEnum.ILoad => 1, // iload <index>
+            OpcodeEnum.FLoad => 1, // fload <index>
+            OpcodeEnum.DLoad => 1, // dload <index>
+            OpcodeEnum.DStore => 1, // dstore <index>
+            OpcodeEnum.LxOr => 2, // lxor <indexbyte1> <indexbyte2>
+            OpcodeEnum.IInc => 2, // iinc <index> <const>
+            OpcodeEnum.IfNe => 2, // ifne <branchbyte1> <branchbyte2>
+            OpcodeEnum.IfICmpLt => 2, // if_icmplt <branchbyte1> <branchbyte2>
+            OpcodeEnum.IfICmpGe => 2, // if_icmpge <branchbyte1> <branchbyte2>
+            OpcodeEnum.IfICmpGt => 2, // if_icmpgt <branchbyte1> <branchbyte2>
+            OpcodeEnum.IfICmpLe => 2, // if_icmple <branchbyte1> <branchbyte2>
+            OpcodeEnum.GoTo => 1, // goto <branchbyte1> <branchbyte2>
+            OpcodeEnum.InvokeStatic => 2, // invokestatic <indexbyte1> <indexbyte2>
+            OpcodeEnum.GetStatic => 2, // getstatic <indexbyte1> <indexbyte2>
+            OpcodeEnum.InvokeVirtual => 2, // invokevirtual <indexbyte1> <indexbyte2>
+            OpcodeEnum.InvokeDynamic => 4, // invokedynamic <indexbyte1> <indexbyte2> 0 0
+            else => 0, // nessun operand
         };
     }
 

@@ -556,7 +556,7 @@ pub const JVMInterpreter = struct {
 
                         const codeAttr = method.code orelse return error.NoCodeAttribute;
 
-                        frame.pc += opcode.getOperandLength();
+                        frame.pc += 1 + opcode.getOperandLength();
 
                         var new_frame = try Frame.init(allocator, codeAttr, frame.class);
 
@@ -595,8 +595,8 @@ pub const JVMInterpreter = struct {
                     },
                     OpcodeEnum.Return => { // return
                         _ = try self.vm.stack.pop();
-
-                        return;
+                        if (self.vm.stack.top == 0) break;
+                        continue;
                     },
                     OpcodeEnum.GetStatic => { // getstatic
                         const indexbyte1 = frame.getCodeByte(frame.pc + 1);
@@ -681,7 +681,7 @@ pub const JVMInterpreter = struct {
 
                             const num_params = method.?.num_params + 1;
 
-                            frame.pc += opcode.getOperandLength();
+                            frame.pc += 1 + opcode.getOperandLength();
 
                             var new_frame = try Frame.initStdFunctionFrame(allocator, std_function, num_params, frame.class);
 
@@ -801,14 +801,12 @@ pub const JVMInterpreter = struct {
                         try frame.operand_stack.push(Value{
                             .Reference = @ptrCast(@alignCast(js)),
                         });
-
-                        frame.pc += opcode.getOperandLength();
-                        continue;
                     },
                 }
 
-                frame.pc += opcode.getOperandLength();
+                frame.pc += 1 + opcode.getOperandLength();
             }
         }
+        return;
     }
 };

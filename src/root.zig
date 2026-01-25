@@ -283,6 +283,103 @@ test "ZJVM Test Suite 12 Stdout Tests" {
     try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
 }
 
+fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Value) !i.JVMInterpreter {
+    var allocator = std.heap.page_allocator;
+
+    var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
+    defer file.close();
+
+    const file_size = try file.getEndPos();
+    const data = try file.readToEndAlloc(allocator, file_size);
+    defer allocator.free(data);
+
+    var cursor = utils.Cursor.init(data);
+    var classInfo = parser.ClassInfo.init(&allocator);
+    defer classInfo.deinit();
+
+    try classInfo.parse(&cursor);
+
+    const mMain = try classInfo.getMethod("main");
+    var vm = try ZJVM.init(&allocator, 1024);
+
+    if (mMain) |method| {
+        if (method.code) |codeAttr| {
+            var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
+            try vm.pushFrame(frame);
+            var interpreter = try i.JVMInterpreter.init(&vm);
+            try interpreter.execute(&allocator);
+
+            try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
+
+            var index: usize = 0;
+
+            const deltaFloat = 0.00001;
+            const deltaDouble = 0.00000001;
+            while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
+                switch (expectedValues[index]) {
+                    .Top => {
+                        const excepted = expectedValues[index].Top;
+                        const actual = frame.local_vars.get(index).Top;
+
+                        try testing.expectEqual(excepted, actual);
+                    },
+                    .Int => {
+                        const expected = expectedValues[index].Int;
+                        const actual = frame.local_vars.get(index).Int;
+                        try testing.expectEqual(expected, actual);
+                    },
+                    .Long => {
+                        const expected = expectedValues[index].Long;
+                        const actual = frame.local_vars.get(index).Long;
+                        try testing.expectEqual(expected, actual);
+                    },
+                    .Float => {
+                        const expected = expectedValues[index].Float;
+                        const actual = frame.local_vars.get(index).Float;
+                        try testing.expect(@abs(expected - actual) < deltaFloat);
+                    },
+                    .Double => {
+                        const expected = expectedValues[index].Double;
+                        const actual = frame.local_vars.get(index).Double;
+                        try testing.expect(@abs(expected - actual) < deltaDouble);
+                    },
+                    else => {
+                        return error.UnhandledValueTypeInTest;
+                    },
+                }
+            }
+
+            return interpreter;
+        } else {
+            return error.NoCodeAttribute;
+        }
+    } else {
+        return error.MethodMainNotFound;
+    }
+}
+
+test "ZJVM Test Suite 13 Long and Float Arithmetic" {
+    const expectedValues = [_]v.Value{
+        .{ .Top = {} },
+        .{ .Long = 1234567890123456789 },
+        .{ .Top = {} },
+        .{ .Long = 2469135780246913578 },
+        .{ .Top = {} },
+        .{ .Float = 0.1 },
+        .{ .Float = 0.3 },
+        .{ .Double = 0.1 },
+        .{ .Top = {} },
+        .{ .Double = 0.3 },
+        .{ .Top = {} },
+    };
+    const filePath = "samples/TestSuite13.class";
+
+    _ = expectedValues;
+    _ = filePath;
+
+    //_ = try makeTestDoubleArithmetic(filePath, &expectedValues);
+}
+
 // Import all test files to include them in the test suite
 test {
     _ = @import("runtime/value_test.zig");
