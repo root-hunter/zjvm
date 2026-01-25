@@ -10,6 +10,7 @@ const ExceptionTableEntry = @import("../classfile/code.zig").ExceptionTableEntry
 const MethodInfo = @import("../classfile/methods.zig").MethodInfo;
 const utils = @import("../classfile/utils.zig");
 const types = @import("../classfile/types.zig");
+const Heap = @import("heap.zig").Heap;
 
 const PrintStream = struct {
     stream: ?std.fs.File,
@@ -25,12 +26,15 @@ pub const JVMInterpreter = struct {
     stdout: std.fs.File,
     stdin: std.fs.File,
 
+    heap: Heap,
+
     pub fn init(vm: *ZJVM) !JVMInterpreter {
         return JVMInterpreter{
             .print_alloc = std.heap.page_allocator,
             .vm = vm,
             .stdout = std.fs.File.stdout(),
             .stdin = std.fs.File.stdin(),
+            .heap = Heap.init(std.heap.page_allocator),
         };
     }
 
@@ -736,6 +740,25 @@ pub const JVMInterpreter = struct {
                     .InvokeStatic => try self.invokeStatic(allocator, frame),
                     .InvokeVirtual => try self.invokeVirtual(allocator, frame),
                     .InvokeDynamic => try self.invokeDynamic(allocator, frame),
+                    .New => {
+                        const index_high = frame.getCodeByte(frame.pc + 1);
+                        const index_low = frame.getCodeByte(frame.pc + 2);
+
+                        const index: u16 =
+                            (@as(u16, index_high) << 8) | @as(u16, index_low);
+
+                        const class_cp = try frame.class.getConstantPoolEntry(index);
+                        const class_index = switch (class_cp) {
+                            .Class => |c| c,
+                            else => return error.InvalidConstantPoolEntry,
+                        };
+                        const class_name = try frame.class.getConstantUtf8(class_index);
+
+                        std.debug.print("Creating new object of class {s} (not implemented yet)\n", .{class_name});
+
+                        //const new_object = try self.heap.allocateObject(class_name);
+                        //try frame.pushOperand(Value{ .Reference = @ptrCast(@alignCast(new_object)) });
+                    },
                 }
 
                 frame.pc += 1 + opcode.getOperandLength();
