@@ -42,6 +42,236 @@ pub const JVMInterpreter = struct {
         self.stdin = file;
     }
 
+    fn getStatic(self: *JVMInterpreter, allocator: *std.mem.Allocator, frame: *Frame) !void {
+        const indexbyte1 = frame.getCodeByte(frame.pc + 1);
+        const indexbyte2 = frame.getCodeByte(frame.pc + 2);
+
+        const index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
+
+        const fieldref = try frame.class.getFieldRef(index);
+
+        const name_and_type_cp = try frame.class.getConstant(fieldref.name_and_type_index);
+
+        switch (name_and_type_cp) {
+            .NameAndType => |name_and_type| {
+                const class = try frame.class.getConstantUtf8(fieldref.class_index);
+                const name_cp = try frame.class.getConstant(name_and_type.name_index);
+
+                switch (name_cp) {
+                    .Utf8 => |name_str| {
+                        // For now, we only support getting static fields from java/lang/System
+                        if (std.mem.eql(u8, class, "java/lang/System")) {
+                            if (std.mem.eql(u8, name_str, "out")) {
+                                const ps = try allocator.create(PrintStream);
+                                ps.* = PrintStream{
+                                    .stream = self.stdout,
+                                };
+                                try frame.pushOperand(Value{ .Reference = ps });
+                            } else {
+                                std.debug.print("Error: Unsupported static field name {s} in class {any}\n", .{ name_str, class });
+                                return error.FieldNotFound;
+                            }
+                        } else {
+                            std.debug.print("Error: Unsupported class {any} for getstatic\n", .{class});
+                            return error.ClassNotFound;
+                        }
+                    },
+                    else => {
+                        std.debug.print("Error: NameAndType entry at index {d} does not point to a Utf8 entry for name. Found: {s}\n", .{ name_and_type.name_index, @tagName(name_cp) });
+                        return error.InvalidConstantPoolEntry;
+                    },
+                }
+            },
+            else => {
+                std.debug.print("Error: FieldRef entry at index {d} does not point to a NameAndType entry. Found: {s}\n", .{ fieldref.name_and_type_index, @tagName(name_and_type_cp) });
+                return error.InvalidConstantPoolEntry;
+            },
+        }
+    }
+
+    fn invokeVirtual(self: *JVMInterpreter, allocator: *std.mem.Allocator, frame: *Frame) !void {
+        const indexbyte1 = frame.getCodeByte(frame.pc + 1);
+        const indexbyte2 = frame.getCodeByte(frame.pc + 2);
+
+        const method_index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
+
+        const methodref = try frame.class.getMethodRef(method_index);
+
+        const method = try MethodInfo.fromRef(allocator, frame.class, methodref);
+
+        if (method == null) {
+            std.debug.print("Error: MethodRef at index {d} could not be resolved.\n", .{method_index});
+            return error.MethodNotFound;
+        }
+
+        const params = try method.?.getParameterTypes();
+
+        if (params.len + 1 > frame.operand_stack.size) {
+            std.debug.print("Error: Not enough operands on stack for method invocation. Needed {d}, but stack size is {d}\n", .{ params.len + 1, frame.operand_stack.size });
+            return error.StackUnderflow;
+        }
+
+        // const method_name = try frame.class.getConstantUtf8(method_index);
+
+        if (!std.mem.eql(u8, method.?.name, "println")) {
+            std.debug.print("Error: Unsupported virtual method {s}\n", .{method.?.name});
+            return error.MethodNotFound;
+        } else {
+            const std_function = StdFunction{
+                .func = .Println,
+                .method = method.?,
+            };
+
+            const is2Slots = utils.is2SlotType(params[0].bytes);
+
+            const num_params = method.?.num_params + 1;
+
+            //frame.pc += 1 + opcode.getOperandLength();
+
+            var new_frame = try Frame.initStdFunctionFrame(allocator, std_function, num_params, frame.class);
+
+            if (is2Slots) {
+                // Double takes two slots
+                try new_frame.pushOperand(try frame.popOperand());
+                // Top slot for double
+                try new_frame.pushOperand(try frame.popOperand());
+            } else {
+                try new_frame.pushOperand(try frame.popOperand());
+            }
+
+            // Then the object reference
+            try new_frame.pushOperand(try frame.popOperand());
+            try self.vm.pushFrame(new_frame);
+        }
+    }
+
+    fn invokeDynamic(self: *JVMInterpreter, allocator: *std.mem.Allocator, frame: *Frame) !void {
+        const index: u16 = (@as(u16, frame.getCodeByte(frame.pc + 1)) << 8) | @as(u16, frame.getCodeByte(frame.pc + 2));
+
+        // --- COSTANTE CP ---
+        const entry = try frame.class.getConstantPoolEntry(index);
+        const indy = switch (entry) {
+            .InvokeDynamic => |i| i,
+            else => return error.InvalidConstantPoolEntry,
+        };
+
+        // --- BOOTSTRAP METHOD ---
+        const bootstrap = try frame.class.getBootstrapMethod(index);
+        // std.debug.print("Invokedynamic bootstrap method: {any}\n", .{bootstrap});
+
+        // --- NAME AND TYPE ---
+        const nat_cp = try frame.class.getConstantPoolEntry(indy.name_and_type_index);
+        const nat = switch (nat_cp) {
+            .NameAndType => |nt| nt,
+            else => return error.InvalidConstantPoolEntry,
+        };
+
+        const name = try frame.class.getConstantUtf8(nat.name_index);
+        const descriptor = try frame.class.getConstantUtf8(nat.descriptor_index);
+        const param_count: usize = utils.getParameterCount(descriptor);
+
+        if (!std.mem.eql(u8, name, "makeConcatWithConstants")) {
+            std.debug.print("Unsupported invokedynamic: {s}\n", .{name});
+            return error.UnsupportedOpcode;
+        }
+
+        // std.debug.print("Invokedynamic makeConcatWithConstants called with descriptor: {s}\n", .{descriptor});
+
+        if (bootstrap.bootstrap_args == null or bootstrap.bootstrap_args.?.len == 0) {
+            return error.InvalidBootstrapArgs;
+        }
+
+        const template_idx = bootstrap.bootstrap_args.?[0];
+        const template_str = try frame.class.getConstantString(template_idx);
+
+        // std.debug.print("  Template string: {s}\n", .{template_str});
+
+        var res = try std.ArrayList(u8).initCapacity(self.print_alloc, 64);
+        var param_idx: usize = 0;
+        var params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
+
+        // std.debug.print("  Concatenating {d} parameters:\n", .{param_count});
+
+        var i: usize = 0;
+        var temp_params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
+        while (i < param_count) : (i += 1) {
+            var v = try frame.popOperand();
+
+            while (v == .Top) {
+                v = try frame.popOperand();
+            }
+
+            var s: ?[]const u8 = null;
+
+            switch (v) {
+                .Int => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
+                .Float => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
+                .Long => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
+                .Double => |x| {
+                    s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x});
+                },
+                .Reference => |r| {
+                    const js: *JavaString = @ptrCast(@alignCast(r));
+                    s = js.bytes;
+                },
+                else => {
+                    std.debug.print("Unsupported parameter type for makeConcatWithConstants: {any}\n", .{v});
+                    return error.UnsupportedType;
+                },
+            }
+
+            if (s == null) return error.UnsupportedType;
+
+            try temp_params.append(self.print_alloc, s.?);
+        }
+
+        // --- Invertiamo l’array dei parametri per rispettare l’ordine JVM ---
+        for (0..param_count) |j| {
+            try params.append(self.print_alloc, temp_params.items[param_count - 1 - j]);
+        }
+
+        for (template_str) |c| {
+            if (c == 0x01) {
+                if (param_idx >= params.items.len) return error.InvalidParameterCount;
+                try res.appendSlice(self.print_alloc, params.items[param_idx]);
+                param_idx += 1;
+            } else {
+                try res.append(self.print_alloc, c);
+            }
+        }
+
+        const js = try allocator.create(JavaString);
+        js.* = JavaString{ .bytes = res.items };
+
+        try frame.pushOperand(Value{
+            .Reference = @ptrCast(@alignCast(js)),
+        });
+    }
+
+    fn invokeStatic(self: *JVMInterpreter, allocator: *std.mem.Allocator, frame: *Frame) !void {
+        const index_high = frame.getCodeByte(frame.pc + 1);
+        const index_low = frame.getCodeByte(frame.pc + 2);
+
+        const method_index: u16 =
+            (@as(u16, index_high) << 8) | @as(u16, index_low);
+
+        const method_name = try frame.class.getConstantUtf8(method_index);
+        const method = try frame.class.getMethod(method_name) orelse return error.MethodNotFound;
+
+        const codeAttr = method.code orelse return error.NoCodeAttribute;
+
+        //frame.pc += 1 + opcode.getOperandLength();
+
+        var new_frame = try Frame.init(allocator, codeAttr, frame.class);
+
+        for (0..method.num_params) |i| {
+            const arg = try frame.popOperand();
+            new_frame.local_vars.vars[method.num_params - 1 - i] = arg;
+        }
+
+        try self.vm.pushFrame(new_frame);
+    }
+
     pub fn execute(self: *JVMInterpreter, allocator: *std.mem.Allocator) !void {
         while (true) {
             const frame = self.vm.currentFrame() orelse return error.NoFrame;
@@ -483,30 +713,7 @@ pub const JVMInterpreter = struct {
                             continue;
                         }
                     },
-                    .InvokeStatic => {
-                        const index_high = frame.getCodeByte(frame.pc + 1);
-                        const index_low = frame.getCodeByte(frame.pc + 2);
-
-                        const method_index: u16 =
-                            (@as(u16, index_high) << 8) | @as(u16, index_low);
-
-                        const method_name = try frame.class.getConstantUtf8(method_index);
-                        const method = try frame.class.getMethod(method_name) orelse return error.MethodNotFound;
-
-                        const codeAttr = method.code orelse return error.NoCodeAttribute;
-
-                        frame.pc += 1 + opcode.getOperandLength();
-
-                        var new_frame = try Frame.init(allocator, codeAttr, frame.class);
-
-                        for (0..method.num_params) |i| {
-                            const arg = try frame.popOperand();
-                            new_frame.local_vars.vars[method.num_params - 1 - i] = arg;
-                        }
-
-                        try self.vm.pushFrame(new_frame);
-                        continue;
-                    },
+                    .InvokeStatic => try self.invokeStatic(allocator, frame),
                     .GoTo => {
                         const offset_high = frame.getCodeByte(frame.pc + 1);
                         const offset_low = frame.getCodeByte(frame.pc + 2);
@@ -537,210 +744,9 @@ pub const JVMInterpreter = struct {
                         if (self.vm.stack.top == 0) break;
                         continue;
                     },
-                    .GetStatic => { // getstatic
-                        const indexbyte1 = frame.getCodeByte(frame.pc + 1);
-                        const indexbyte2 = frame.getCodeByte(frame.pc + 2);
-
-                        const index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
-
-                        const fieldref = try frame.class.getFieldRef(index);
-
-                        const name_and_type_cp = try frame.class.getConstant(fieldref.name_and_type_index);
-
-                        switch (name_and_type_cp) {
-                            .NameAndType => |name_and_type| {
-                                const class = try frame.class.getConstantUtf8(fieldref.class_index);
-                                const name_cp = try frame.class.getConstant(name_and_type.name_index);
-
-                                switch (name_cp) {
-                                    .Utf8 => |name_str| {
-                                        // For now, we only support getting static fields from java/lang/System
-                                        if (std.mem.eql(u8, class, "java/lang/System")) {
-                                            if (std.mem.eql(u8, name_str, "out")) {
-                                                const ps = try allocator.create(PrintStream);
-                                                ps.* = PrintStream{
-                                                    .stream = self.stdout,
-                                                };
-                                                try frame.pushOperand(Value{ .Reference = ps });
-                                            } else {
-                                                std.debug.print("Error: Unsupported static field name {s} in class {any}\n", .{ name_str, class });
-                                                return error.FieldNotFound;
-                                            }
-                                        } else {
-                                            std.debug.print("Error: Unsupported class {any} for getstatic\n", .{class});
-                                            return error.ClassNotFound;
-                                        }
-                                    },
-                                    else => {
-                                        std.debug.print("Error: NameAndType entry at index {d} does not point to a Utf8 entry for name. Found: {s}\n", .{ name_and_type.name_index, @tagName(name_cp) });
-                                        return error.InvalidConstantPoolEntry;
-                                    },
-                                }
-                            },
-                            else => {
-                                std.debug.print("Error: FieldRef entry at index {d} does not point to a NameAndType entry. Found: {s}\n", .{ fieldref.name_and_type_index, @tagName(name_and_type_cp) });
-                                return error.InvalidConstantPoolEntry;
-                            },
-                        }
-                    },
-                    .InvokeVirtual => { // invokevirtual
-                        const indexbyte1 = frame.getCodeByte(frame.pc + 1);
-                        const indexbyte2 = frame.getCodeByte(frame.pc + 2);
-
-                        const method_index: u16 = (@as(u16, indexbyte1) << 8) | @as(u16, indexbyte2);
-
-                        const methodref = try frame.class.getMethodRef(method_index);
-
-                        const method = try MethodInfo.fromRef(allocator, frame.class, methodref);
-
-                        if (method == null) {
-                            std.debug.print("Error: MethodRef at index {d} could not be resolved.\n", .{method_index});
-                            return error.MethodNotFound;
-                        }
-
-                        const params = try method.?.getParameterTypes();
-
-                        if (params.len + 1 > frame.operand_stack.size) {
-                            std.debug.print("Error: Not enough operands on stack for method invocation. Needed {d}, but stack size is {d}\n", .{ params.len + 1, frame.operand_stack.size });
-                            return error.StackUnderflow;
-                        }
-
-                        // const method_name = try frame.class.getConstantUtf8(method_index);
-
-                        if (!std.mem.eql(u8, method.?.name, "println")) {
-                            std.debug.print("Error: Unsupported virtual method {s}\n", .{method.?.name});
-                            return error.MethodNotFound;
-                        } else {
-                            const std_function = StdFunction{
-                                .func = .Println,
-                                .method = method.?,
-                            };
-
-                            const is2Slots = utils.is2SlotType(params[0].bytes);
-
-                            const num_params = method.?.num_params + 1;
-
-                            frame.pc += 1 + opcode.getOperandLength();
-
-                            var new_frame = try Frame.initStdFunctionFrame(allocator, std_function, num_params, frame.class);
-
-                            if (is2Slots) {
-                                // Double takes two slots
-                                try new_frame.pushOperand(try frame.popOperand());
-                                // Top slot for double
-                                try new_frame.pushOperand(try frame.popOperand());
-                            } else {
-                                try new_frame.pushOperand(try frame.popOperand());
-                            }
-
-                            // Then the object reference
-                            try new_frame.pushOperand(try frame.popOperand());
-                            try self.vm.pushFrame(new_frame);
-                            continue;
-                        }
-                    },
-                    .InvokeDynamic => {
-                        const index: u16 = (@as(u16, frame.getCodeByte(frame.pc + 1)) << 8) | @as(u16, frame.getCodeByte(frame.pc + 2));
-
-                        // --- COSTANTE CP ---
-                        const entry = try frame.class.getConstantPoolEntry(index);
-                        const indy = switch (entry) {
-                            .InvokeDynamic => |i| i,
-                            else => return error.InvalidConstantPoolEntry,
-                        };
-
-                        // --- BOOTSTRAP METHOD ---
-                        const bootstrap = try frame.class.getBootstrapMethod(index);
-                        // std.debug.print("Invokedynamic bootstrap method: {any}\n", .{bootstrap});
-
-                        // --- NAME AND TYPE ---
-                        const nat_cp = try frame.class.getConstantPoolEntry(indy.name_and_type_index);
-                        const nat = switch (nat_cp) {
-                            .NameAndType => |nt| nt,
-                            else => return error.InvalidConstantPoolEntry,
-                        };
-
-                        const name = try frame.class.getConstantUtf8(nat.name_index);
-                        const descriptor = try frame.class.getConstantUtf8(nat.descriptor_index);
-                        const param_count: usize = utils.getParameterCount(descriptor);
-
-                        if (!std.mem.eql(u8, name, "makeConcatWithConstants")) {
-                            std.debug.print("Unsupported invokedynamic: {s}\n", .{name});
-                            return error.UnsupportedOpcode;
-                        }
-
-                        // std.debug.print("Invokedynamic makeConcatWithConstants called with descriptor: {s}\n", .{descriptor});
-
-                        if (bootstrap.bootstrap_args == null or bootstrap.bootstrap_args.?.len == 0) {
-                            return error.InvalidBootstrapArgs;
-                        }
-
-                        const template_idx = bootstrap.bootstrap_args.?[0];
-                        const template_str = try frame.class.getConstantString(template_idx);
-
-                        // std.debug.print("  Template string: {s}\n", .{template_str});
-
-                        var res = try std.ArrayList(u8).initCapacity(self.print_alloc, 64);
-                        var param_idx: usize = 0;
-                        var params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
-
-                        // std.debug.print("  Concatenating {d} parameters:\n", .{param_count});
-
-                        var i: usize = 0;
-                        var temp_params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
-                        while (i < param_count) : (i += 1) {
-                            var v = try frame.popOperand();
-
-                            while (v == .Top) {
-                                v = try frame.popOperand();
-                            }
-
-                            var s: ?[]const u8 = null;
-
-                            switch (v) {
-                                .Int => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
-                                .Float => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
-                                .Long => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
-                                .Double => |x| {
-                                    s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x});
-                                },
-                                .Reference => |r| {
-                                    const js: *JavaString = @ptrCast(@alignCast(r));
-                                    s = js.bytes;
-                                },
-                                else => {
-                                    std.debug.print("Unsupported parameter type for makeConcatWithConstants: {any}\n", .{v});
-                                    return error.UnsupportedType;
-                                },
-                            }
-
-                            if (s == null) return error.UnsupportedType;
-
-                            try temp_params.append(self.print_alloc, s.?);
-                        }
-
-                        // --- Invertiamo l’array dei parametri per rispettare l’ordine JVM ---
-                        for (0..param_count) |j| {
-                            try params.append(self.print_alloc, temp_params.items[param_count - 1 - j]);
-                        }
-
-                        for (template_str) |c| {
-                            if (c == 0x01) {
-                                if (param_idx >= params.items.len) return error.InvalidParameterCount;
-                                try res.appendSlice(self.print_alloc, params.items[param_idx]);
-                                param_idx += 1;
-                            } else {
-                                try res.append(self.print_alloc, c);
-                            }
-                        }
-
-                        const js = try allocator.create(JavaString);
-                        js.* = JavaString{ .bytes = res.items };
-
-                        try frame.pushOperand(Value{
-                            .Reference = @ptrCast(@alignCast(js)),
-                        });
-                    },
+                    .GetStatic => try self.getStatic(allocator, frame),
+                    .InvokeVirtual => try self.invokeVirtual(allocator, frame),
+                    .InvokeDynamic => try self.invokeDynamic(allocator, frame),
                 }
 
                 frame.pc += 1 + opcode.getOperandLength();
