@@ -273,8 +273,8 @@ var file = try std.fs.cwd().openFile("samples/FileName.class", .{ .mode = .read_
 
 ## 🚧 Roadmap
 
-- [ ] Support for more types (long, float, double)
-- [ ] Virtual method calls implementation
+- [x] Support for more types (long, float, double)
+- [x] Virtual method calls implementation
 - [ ] Garbage collection
 - [ ] Array support
 - [ ] Exception handling support
