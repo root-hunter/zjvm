@@ -68,7 +68,7 @@ fn println(env: *registry.NativeEnv, args: ?[]Value) !Value {
         return error.InvalidArguments;
     }
 
-    const value = args.?[1];
+    const value = args.?[0];
 
     var value_str: ?[]const u8 = null;
 

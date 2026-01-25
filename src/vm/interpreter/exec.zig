@@ -152,17 +152,19 @@ pub const JVMInterpreter = struct {
 
         var i: usize = 0;
 
-        while (i < np) : (i += 1) {
+        while (i < np - 1) : (i += 1) {
             var val: ?Value = null;
 
-            if (utils.is2SlotType(params[0].bytes)) {
+            if (utils.is2SlotType(params[i].bytes)) {
                 val = try frame.pop2Operand();
             } else {
                 val = try frame.popOperand();
             }
 
-            args[np - 1 - i] = val.?;
+            args[np - 2 - i] = val.?;
         }
+
+        _ = try frame.popOperand(); // pop this
 
         _ = bootstrap_method.?(
             &ne,
