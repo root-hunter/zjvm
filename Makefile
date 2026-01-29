@@ -8,12 +8,14 @@ build-debug:
 	zig build-exe -fllvm src/main.zig -femit-bin=zig-out/zjvm-debug -Doptimize=Debug
 	@echo "ZJVM debug build complete."
 
-build-examples:
+clear-java-classes:
+	@echo "Clearing Java test class files..."
+	find examples -name "*.class" -type f -delete
+	@echo "Java test class files cleared."
+
+build-examples: clear-java-classes
 	@echo "Building Java test class files..."
-	for file in examples/**/*.java ; do \
-		echo "Compiling $$file" ; \
-		javac $$file ; \
-	done
+	find examples -name "*.java" -print0 | xargs -0 javac
 	@echo "Java test class files build complete."
 
 build:
