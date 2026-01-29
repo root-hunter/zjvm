@@ -78,13 +78,13 @@ fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: 
     }
 
     const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
+    vm.setStdout(logFile);
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
             const frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
             var interpreter = try i.JVMInterpreter.init();
-            interpreter.setStdout(logFile);
             try interpreter.execute(&vm, &allocator);
 
             // Compare log file with expected output
@@ -306,13 +306,13 @@ fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Valu
 
     const mMain = try classInfo.getMethod("main");
     var vm = try ZJVM.init(&allocator, 1024);
+    vm.setStdout(logFile);
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
             var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
             var interpreter = try i.JVMInterpreter.init();
-            interpreter.setStdout(logFile);
             try interpreter.execute(&vm, &allocator);
 
             try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);

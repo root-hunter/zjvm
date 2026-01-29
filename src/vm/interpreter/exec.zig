@@ -18,45 +18,16 @@ const JavaLang = @import("../native/java_lang.zig");
 
 pub const JVMInterpreter = struct {
     print_alloc: std.mem.Allocator,
-    stdout: std.fs.File,
-    stdin: std.fs.File,
-
-    nr: registry.NativeRegistry,
-
-    heap: Heap,
-
-    pub fn getNativeEnv(self: *JVMInterpreter) registry.NativeEnv {
-        return registry.NativeEnv{
-            .heap = &self.heap,
-            .stdout = &self.stdout,
-        };
-    }
 
     pub fn init() !JVMInterpreter {
         const allocator = std.heap.page_allocator;
-        const heap = Heap.init(allocator);
-
-        var nr = try registry.NativeRegistry.init(allocator);
-        try JavaLang.registerAll(&nr);
 
         return JVMInterpreter{
             .print_alloc = allocator,
-            .stdout = std.fs.File.stdout(),
-            .stdin = std.fs.File.stdin(),
-            .heap = heap,
-            .nr = nr,
         };
     }
 
-    pub fn setStdout(self: *JVMInterpreter, file: std.fs.File) void {
-        self.stdout = file;
-    }
-
-    pub fn setStdin(self: *JVMInterpreter, file: std.fs.File) void {
-        self.stdin = file;
-    }
-
-    fn getStatic(self: *JVMInterpreter, allocator: *std.mem.Allocator, frame: *Frame) !void {
+    fn getStatic(vm: *ZJVM, allocator: *std.mem.Allocator, frame: *Frame) !void {
         const indexbyte1 = frame.getCodeByte(frame.pc + 1);
         const indexbyte2 = frame.getCodeByte(frame.pc + 2);
 
@@ -78,7 +49,7 @@ pub const JVMInterpreter = struct {
                             if (std.mem.eql(u8, name_str, "out")) {
                                 const ps = try allocator.create(PrintStream);
                                 ps.* = PrintStream{
-                                    .stream = self.stdout,
+                                    .stream = vm.stdout,
                                 };
                                 try frame.pushOperand(Value{ .Reference = ps });
                             } else {
@@ -103,7 +74,7 @@ pub const JVMInterpreter = struct {
         }
     }
 
-    fn invokeVirtual(self: *JVMInterpreter, allocator: *std.mem.Allocator, frame: *Frame) !void {
+    fn invokeVirtual(self: *JVMInterpreter, vm: *ZJVM, allocator: *std.mem.Allocator, frame: *Frame) !void {
         const indexbyte1 = frame.getCodeByte(frame.pc + 1);
         const indexbyte2 = frame.getCodeByte(frame.pc + 2);
 
@@ -126,7 +97,7 @@ pub const JVMInterpreter = struct {
 
         // std.debug.print("Invoking {s} ({s}) from class {s}\n", .{ method.?.name, method_signature, method_class });
 
-        const bootstrap_method = self.nr.find(method_class, method_name, method_signature);
+        const bootstrap_method = vm.nr.find(method_class, method_name, method_signature);
 
         if (bootstrap_method == null) {
             std.debug.print("Error: Method {s} with signature {s} not found in native registry.\n", .{ method_name, method_signature });
@@ -142,7 +113,7 @@ pub const JVMInterpreter = struct {
 
         const np = method.?.num_params + 1;
 
-        var ne = self.getNativeEnv();
+        var ne = vm.getNativeEnv();
         const args = self.print_alloc.alloc(Value, np) catch {
             std.debug.print("Error: Out of memory while allocating arguments for method invocation.\n", .{});
             return error.OutOfMemory;
@@ -693,9 +664,9 @@ pub const JVMInterpreter = struct {
                     if (vm.stack.top == 0) break;
                     continue;
                 },
-                .GetStatic => try self.getStatic(allocator, frame),
-                .InvokeStatic => try JVMInterpreter.invokeStatic(vm, allocator, frame),
-                .InvokeVirtual => try self.invokeVirtual(allocator, frame),
+                .GetStatic => try getStatic(vm, allocator, frame),
+                .InvokeStatic => try invokeStatic(vm, allocator, frame),
+                .InvokeVirtual => try self.invokeVirtual(vm, allocator, frame),
                 .InvokeDynamic => try self.invokeDynamic(allocator, frame),
                 .New => {
                     const index_high = frame.getCodeByte(frame.pc + 1);
