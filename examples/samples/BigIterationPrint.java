@@ -1,4 +1,4 @@
-public class TestSuite14 {
+public class BigIterationPrint {
    public static void main(String[] var0) {
       System.out.println("This is Test Suite 14.");
       System.out.println("Testing longs and floats.");

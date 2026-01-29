@@ -8,10 +8,18 @@ build-debug:
 	zig build-exe -fllvm src/main.zig -femit-bin=zig-out/zjvm-debug -Doptimize=Debug
 	@echo "ZJVM debug build complete."
 
-build-samples:
-	@echo "Building sample Java class files..."
+build-java-tests:
+	@echo "Building Java test class files..."
 	javac examples/tests/*.java
-	@echo "Sample Java class files build complete."
+	@echo "Java test class files build complete."
+
+build-java-samples:
+	@echo "Building sample Java class files..."
+	javac examples/samples/*.java
+	@echo "Sample Java class files build"
+
+build-examples: build-java-tests build-java-samples
+	@echo "All example Java class files built"
 
 build:
 	@echo "Building ZJVM..."
