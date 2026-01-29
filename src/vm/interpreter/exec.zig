@@ -84,11 +84,11 @@ pub const JVMInterpreter = struct {
                                 };
                                 try frame.pushOperand(Value{ .Reference = ps });
                             } else {
-                                std.debug.print("Error: Unsupported static field name {s} in class {any}\n", .{ name_str, class });
+                                std.debug.print("Error: Unsupported static field name {s} in class {s}\n", .{ name_str, class });
                                 return error.FieldNotFound;
                             }
                         } else {
-                            std.debug.print("Error: Unsupported class {any} for getstatic\n", .{class});
+                            std.debug.print("Error: Unsupported class {s} for getstatic\n", .{class});
                             return error.ClassNotFound;
                         }
                     },
