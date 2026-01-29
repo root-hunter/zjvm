@@ -3,8 +3,16 @@ name: Build and Test
 on:
     push:
         branches: [main]
+        paths:
+            - 'src/**'
+            - 'examples/**'
+            - 'tests/**'
     pull_request:
         branches: [main]
+        paths:
+            - 'src/**'
+            - 'examples/**'
+            - 'tests/**'
 
 jobs:
     test:
