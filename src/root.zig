@@ -33,8 +33,8 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !i.JVMIn
         if (method.code) |codeAttr| {
             var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            var interpreter = try i.JVMInterpreter.init(&vm);
-            try interpreter.execute(&allocator);
+            var interpreter = try i.JVMInterpreter.init();
+            try interpreter.execute(&vm, &allocator);
 
             try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
 
@@ -83,9 +83,9 @@ fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: 
         if (method.code) |codeAttr| {
             const frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            var interpreter = try i.JVMInterpreter.init(&vm);
+            var interpreter = try i.JVMInterpreter.init();
             interpreter.setStdout(logFile);
-            try interpreter.execute(&allocator);
+            try interpreter.execute(&vm, &allocator);
 
             // Compare log file with expected output
 
@@ -311,9 +311,9 @@ fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Valu
         if (method.code) |codeAttr| {
             var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            var interpreter = try i.JVMInterpreter.init(&vm);
+            var interpreter = try i.JVMInterpreter.init();
             interpreter.setStdout(logFile);
-            try interpreter.execute(&allocator);
+            try interpreter.execute(&vm, &allocator);
 
             try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
 

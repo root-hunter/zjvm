@@ -17,7 +17,6 @@ const JavaString = @import("../native/java_lang.zig").JavaString;
 const JavaLang = @import("../native/java_lang.zig");
 
 pub const JVMInterpreter = struct {
-    vm: *ZJVM,
     print_alloc: std.mem.Allocator,
     stdout: std.fs.File,
     stdin: std.fs.File,
@@ -33,7 +32,7 @@ pub const JVMInterpreter = struct {
         };
     }
 
-    pub fn init(vm: *ZJVM) !JVMInterpreter {
+    pub fn init() !JVMInterpreter {
         const allocator = std.heap.page_allocator;
         const heap = Heap.init(allocator);
 
@@ -42,7 +41,6 @@ pub const JVMInterpreter = struct {
 
         return JVMInterpreter{
             .print_alloc = allocator,
-            .vm = vm,
             .stdout = std.fs.File.stdout(),
             .stdin = std.fs.File.stdin(),
             .heap = heap,
@@ -278,7 +276,7 @@ pub const JVMInterpreter = struct {
         });
     }
 
-    fn invokeStatic(self: *JVMInterpreter, allocator: *std.mem.Allocator, frame: *Frame) !void {
+    fn invokeStatic(vm: *ZJVM, allocator: *std.mem.Allocator, frame: *Frame) !void {
         const index_high = frame.getCodeByte(frame.pc + 1);
         const index_low = frame.getCodeByte(frame.pc + 2);
 
@@ -299,16 +297,16 @@ pub const JVMInterpreter = struct {
             new_frame.local_vars.vars[method.num_params - 1 - i] = arg;
         }
 
-        try self.vm.pushFrame(new_frame);
+        try vm.pushFrame(new_frame);
     }
 
-    pub fn execute(self: *JVMInterpreter, allocator: *std.mem.Allocator) !void {
+    pub fn execute(self: *JVMInterpreter, vm: *ZJVM, allocator: *std.mem.Allocator) !void {
         while (true) {
-            const frame = self.vm.currentFrame() orelse return error.NoFrame;
+            const frame = vm.currentFrame() orelse return error.NoFrame;
 
             if (frame.pc >= frame.getCodeLength()) {
-                _ = try self.vm.popFrame();
-                if (self.vm.stack.top == 0) break;
+                _ = try vm.popFrame();
+                if (vm.stack.top == 0) break;
                 continue;
             }
 
@@ -679,24 +677,24 @@ pub const JVMInterpreter = struct {
                 .IReturn => {
                     const return_value = try frame.popOperand();
 
-                    _ = try self.vm.stack.pop();
+                    _ = try vm.stack.pop();
 
-                    if (self.vm.stack.top == 0) {
+                    if (vm.stack.top == 0) {
                         break;
                     }
 
-                    var caller = self.vm.stack.current();
+                    var caller = vm.stack.current();
                     try caller.pushOperand(return_value);
 
                     continue;
                 },
                 .Return => { // return
-                    _ = try self.vm.stack.pop();
-                    if (self.vm.stack.top == 0) break;
+                    _ = try vm.stack.pop();
+                    if (vm.stack.top == 0) break;
                     continue;
                 },
                 .GetStatic => try self.getStatic(allocator, frame),
-                .InvokeStatic => try self.invokeStatic(allocator, frame),
+                .InvokeStatic => try JVMInterpreter.invokeStatic(vm, allocator, frame),
                 .InvokeVirtual => try self.invokeVirtual(allocator, frame),
                 .InvokeDynamic => try self.invokeDynamic(allocator, frame),
                 .New => {
