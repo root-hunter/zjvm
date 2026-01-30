@@ -29,7 +29,7 @@ pub const OperandStack = struct {
     top: usize,
     size: usize,
 
-    pub fn init(allocator: *const std.mem.Allocator, max: usize) !OperandStack {
+    pub fn init(allocator: std.mem.Allocator, max: usize) !OperandStack {
         return OperandStack{
             .data = try allocator.alloc(Value, max),
             .top = 0,

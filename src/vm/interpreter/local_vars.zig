@@ -23,7 +23,7 @@ pub const LocalVarsJSON = struct {
 pub const LocalVars = struct {
     vars: []Value,
 
-    pub fn init(allocator: *const std.mem.Allocator, count: usize) !LocalVars {
+    pub fn init(allocator: std.mem.Allocator, count: usize) !LocalVars {
         const vars = try allocator.alloc(Value, count);
         // Inizializza tutte le variabili a Top
         for (vars) |*v| {

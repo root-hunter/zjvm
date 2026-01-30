@@ -31,7 +31,7 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
-            var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
+            var frame = try fr.Frame.init(allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
             try i.JVMInterpreter.execute(&vm, allocator);
 
@@ -78,7 +78,7 @@ fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: 
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
-            const frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
+            const frame = try fr.Frame.init(allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
             try i.JVMInterpreter.execute(&vm, allocator);
 
@@ -305,7 +305,7 @@ fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Valu
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
-            var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
+            var frame = try fr.Frame.init(allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
             try i.JVMInterpreter.execute(&vm, allocator);
 

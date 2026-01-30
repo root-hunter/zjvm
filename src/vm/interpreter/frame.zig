@@ -29,6 +29,9 @@ pub const FrameJSON = struct {
 };
 
 pub const Frame = struct {
+    arena: std.heap.ArenaAllocator,
+    allocator: std.mem.Allocator,
+
     operand_stack: OperandStack,
     local_vars: LocalVars,
     codeAttr: ?ca.CodeAttribute,
@@ -38,31 +41,19 @@ pub const Frame = struct {
     class: *const p.ClassInfo,
 
     pub fn init(
-        allocator: *const std.mem.Allocator,
+        gpa: std.mem.Allocator,
         codeAttr: ca.CodeAttribute,
         class: *const p.ClassInfo,
     ) !Frame {
+        var arena = std.heap.ArenaAllocator.init(gpa);
+        const allocator = arena.allocator();
         return Frame{
+            .arena = arena,
+            .allocator = allocator,
             .operand_stack = try OperandStack.init(allocator, codeAttr.max_stack),
             .local_vars = try LocalVars.init(allocator, codeAttr.max_locals),
             .codeAttr = codeAttr,
             .pc = 0,
-            .class = class,
-        };
-    }
-
-    pub fn initStdFunctionFrame(
-        allocator: *const std.mem.Allocator,
-        std_function: ca.StdFunction,
-        num_locals: usize,
-        class: *const p.ClassInfo,
-    ) !Frame {
-        return Frame{
-            .operand_stack = try OperandStack.init(allocator, 10), // Arbitrary stack size for std functions
-            .local_vars = try LocalVars.init(allocator, num_locals),
-            .codeAttr = null,
-            .pc = 0,
-            .std_function = std_function,
             .class = class,
         };
     }
@@ -117,6 +108,10 @@ pub const Frame = struct {
             const value = try self.popOperand();
             self.local_vars.vars[index] = value;
         }
+    }
+
+    pub fn deinit(self: *Frame) void {
+        self.arena.deinit();
     }
 
     /// Dump function to print all local variables in the frame

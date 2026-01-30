@@ -62,8 +62,6 @@ pub fn registerAll(nr: *registry.NativeRegistry) !void {
 }
 
 fn println(env: *registry.NativeEnv, args: ?[]Value) !Value {
-    const allocator = std.heap.page_allocator;
-
     if (args == null or args.?.len != 2) {
         return error.InvalidArguments;
     }
@@ -74,16 +72,16 @@ fn println(env: *registry.NativeEnv, args: ?[]Value) !Value {
 
     switch (value) {
         .Int => |i| {
-            value_str = std.fmt.allocPrint(allocator, "{}", .{i}) catch return error.OutOfMemory;
+            value_str = std.fmt.allocPrint(env.allocator, "{}", .{i}) catch return error.OutOfMemory;
         },
         .Float => |f| {
-            value_str = std.fmt.allocPrint(allocator, "{}", .{f}) catch return error.OutOfMemory;
+            value_str = std.fmt.allocPrint(env.allocator, "{}", .{f}) catch return error.OutOfMemory;
         },
         .Double => |d| {
-            value_str = std.fmt.allocPrint(allocator, "{}", .{d}) catch return error.OutOfMemory;
+            value_str = std.fmt.allocPrint(env.allocator, "{}", .{d}) catch return error.OutOfMemory;
         },
         .Long => |l| {
-            value_str = std.fmt.allocPrint(allocator, "{}", .{l}) catch return error.OutOfMemory;
+            value_str = std.fmt.allocPrint(env.allocator, "{}", .{l}) catch return error.OutOfMemory;
         },
         .Reference => |r| {
             const js: *JavaString = @ptrCast(@alignCast(r));

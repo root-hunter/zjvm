@@ -31,10 +31,11 @@ pub const ZJVM = struct {
         self.stdin = file;
     }
 
-    pub fn getNativeEnv(self: *ZJVM) registry.NativeEnv {
+    pub fn getNativeEnv(self: *ZJVM, allocator: std.mem.Allocator) registry.NativeEnv {
         return registry.NativeEnv{
             .heap = &self.heap,
             .stdout = &self.stdout,
+            .allocator = allocator,
         };
     }
 

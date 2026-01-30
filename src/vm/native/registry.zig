@@ -5,6 +5,7 @@ pub const NativeEnv = struct {
     // placeholder: heap, vm, thread, ecc
     heap: *anyopaque,
     stdout: *const std.fs.File,
+    allocator: std.mem.Allocator,
 };
 
 pub const NativeFn = fn (

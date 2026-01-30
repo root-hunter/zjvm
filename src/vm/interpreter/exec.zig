@@ -17,11 +17,10 @@ const JavaString = @import("../native/java_lang.zig").JavaString;
 const JavaLang = @import("../native/java_lang.zig");
 
 pub const JVMInterpreter = struct {
-    pub fn init() !JVMInterpreter {
-        return JVMInterpreter{};
-    }
-
     fn getStatic(vm: *ZJVM, allocator: std.mem.Allocator, frame: *Frame) !void {
+        _ = vm;
+        _ = allocator;
+
         const indexbyte1 = frame.getCodeByte(frame.pc + 1);
         const indexbyte2 = frame.getCodeByte(frame.pc + 2);
 
@@ -41,11 +40,11 @@ pub const JVMInterpreter = struct {
                         // For now, we only support getting static fields from java/lang/System
                         if (std.mem.eql(u8, class, "java/lang/System")) {
                             if (std.mem.eql(u8, name_str, "out")) {
-                                const ps = try allocator.create(PrintStream);
-                                ps.* = PrintStream{
-                                    .stream = vm.stdout,
-                                };
-                                try frame.pushOperand(Value{ .Reference = ps });
+                                // const ps = try allocator.create(PrintStream);
+                                // ps.* = PrintStream{
+                                //     .stream = vm.stdout,
+                                // };
+                                try frame.pushOperand(Value{ .Reference = null });
                             } else {
                                 std.debug.print("Error: Unsupported static field name {s} in class {s}\n", .{ name_str, class });
                                 return error.FieldNotFound;
@@ -107,11 +106,12 @@ pub const JVMInterpreter = struct {
 
         const np = method.?.num_params + 1;
 
-        var ne = vm.getNativeEnv();
+        var ne = vm.getNativeEnv(allocator);
         const args = allocator.alloc(Value, np) catch {
             std.debug.print("Error: Out of memory while allocating arguments for method invocation.\n", .{});
             return error.OutOfMemory;
         };
+        defer allocator.free(args);
 
         var i: usize = 0;
 
@@ -127,8 +127,9 @@ pub const JVMInterpreter = struct {
             args[np - 2 - i] = val.?;
         }
 
-        _ = try frame.popOperand(); // pop this
-
+        const this = try frame.popOperand(); // pop this
+        args[np - 1] = this;
+        
         _ = bootstrap_method.?(
             &ne,
             args,
@@ -180,13 +181,16 @@ pub const JVMInterpreter = struct {
         // std.debug.print("  Template string: {s}\n", .{template_str});
 
         var res = try std.ArrayList(u8).initCapacity(allocator, 64);
+
         var param_idx: usize = 0;
         var params = try std.ArrayList([]const u8).initCapacity(allocator, param_count);
-
+        defer params.deinit(allocator);
         // std.debug.print("  Concatenating {d} parameters:\n", .{param_count});
 
         var i: usize = 0;
         var temp_params = try std.ArrayList([]const u8).initCapacity(allocator, param_count);
+        defer temp_params.deinit(allocator);
+
         while (i < param_count) : (i += 1) {
             var v = try frame.popOperand();
 
@@ -255,7 +259,7 @@ pub const JVMInterpreter = struct {
 
         //frame.pc += 1 + opcode.getOperandLength();
 
-        var new_frame = try Frame.init(&allocator, codeAttr, frame.class);
+        var new_frame = try Frame.init(allocator, codeAttr, frame.class);
 
         for (0..method.num_params) |i| {
             const arg = try frame.popOperand();
@@ -642,7 +646,8 @@ pub const JVMInterpreter = struct {
                 .IReturn => {
                     const return_value = try frame.popOperand();
 
-                    _ = try vm.stack.pop();
+                    var popFrame = try vm.stack.pop();
+                    popFrame.deinit();
 
                     if (vm.stack.top == 0) {
                         break;
@@ -654,7 +659,8 @@ pub const JVMInterpreter = struct {
                     continue;
                 },
                 .Return => { // return
-                    _ = try vm.stack.pop();
+                    var popFrame = try vm.stack.pop();
+                    popFrame.deinit();
                     if (vm.stack.top == 0) break;
                     continue;
                 },
