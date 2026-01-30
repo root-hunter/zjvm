@@ -50,7 +50,7 @@ pub fn main() !void {
     const mMain = try classInfo.getMethod("main");
     try classInfo.dump();
 
-    var vm = try ZJVM.init(&allocator, 1024);
+    var vm = try ZJVM.bootstrap(&allocator, 1024);
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {

@@ -38,7 +38,7 @@ pub const ZJVM = struct {
         };
     }
 
-    pub fn init(allocator: *const std.mem.Allocator, maxFrames: usize) !ZJVM {
+    pub fn bootstrap(allocator: *const std.mem.Allocator, maxFrames: usize) !ZJVM {
         const alloc = std.heap.page_allocator;
         var nr = try registry.NativeRegistry.init(alloc);
         try JavaLang.registerAll(&nr);

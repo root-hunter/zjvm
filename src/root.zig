@@ -27,7 +27,7 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !i.JVMIn
     try classInfo.parse(&cursor);
 
     const mMain = try classInfo.getMethod("main");
-    var vm = try ZJVM.init(&allocator, 1024);
+    var vm = try ZJVM.bootstrap(&allocator, 1024);
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
@@ -69,7 +69,7 @@ fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: 
     try classInfo.parse(&cursor);
 
     const mMain = try classInfo.getMethod("main");
-    var vm = try ZJVM.init(&allocator, 1024);
+    var vm = try ZJVM.bootstrap(&allocator, 1024);
 
     const res = std.fs.cwd().makeDir("examples/outputs");
 
@@ -305,7 +305,7 @@ fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Valu
     try classInfo.parse(&cursor);
 
     const mMain = try classInfo.getMethod("main");
-    var vm = try ZJVM.init(&allocator, 1024);
+    var vm = try ZJVM.bootstrap(&allocator, 1024);
     vm.setStdout(logFile);
 
     if (mMain) |method| {
