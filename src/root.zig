@@ -9,7 +9,7 @@ const ZJVM = @import("vm/vm.zig").ZJVM;
 
 const testing = std.testing;
 
-fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !i.JVMInterpreter {
+fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     var allocator = gpa.allocator();
 
@@ -33,8 +33,7 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !i.JVMIn
         if (method.code) |codeAttr| {
             var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            var interpreter = try i.JVMInterpreter.init();
-            try interpreter.execute(&vm, &allocator);
+            try i.JVMInterpreter.execute(&vm, allocator);
 
             try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
 
@@ -42,13 +41,10 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !i.JVMIn
             while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
                 try testing.expectEqual(expectedValues[index], frame.local_vars.get(index));
             }
-            return interpreter;
         } else {
             return error.NoCodeAttribute;
         }
     }
-
-    return error.MethodMainNotFound;
 }
 
 fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: []const []const u8) !void {
@@ -84,8 +80,7 @@ fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: 
         if (method.code) |codeAttr| {
             const frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            var interpreter = try i.JVMInterpreter.init();
-            try interpreter.execute(&vm, &allocator);
+            try i.JVMInterpreter.execute(&vm, allocator);
 
             // Compare log file with expected output
 
@@ -124,7 +119,7 @@ test "ZJVM Test Suite 1" {
     };
     const filePath = "examples/tests/TestSuite1.class";
 
-    _ = try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 2" {
@@ -136,7 +131,7 @@ test "ZJVM Test Suite 2" {
         .{ .Int = 80 },
     };
     const filePath = "examples/tests/TestSuite2.class";
-    _ = try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 3" {
@@ -149,7 +144,7 @@ test "ZJVM Test Suite 3" {
         .{ .Int = 0 },
     };
     const filePath = "examples/tests/TestSuite3.class";
-    _ = try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 4" {
@@ -164,7 +159,7 @@ test "ZJVM Test Suite 4" {
         .{ .Int = 24100 },
     };
     const filePath = "examples/tests/TestSuite4.class";
-    _ = try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 5" {
@@ -175,7 +170,7 @@ test "ZJVM Test Suite 5" {
         .{ .Int = 20736 },
     };
     const filePath = "examples/tests/TestSuite5.class";
-    _ = try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 6" {
@@ -187,7 +182,7 @@ test "ZJVM Test Suite 6" {
         .{ .Int = 5013 },
     };
     const filePath = "examples/tests/TestSuite6.class";
-    _ = try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 7" {
@@ -199,7 +194,7 @@ test "ZJVM Test Suite 7" {
         .{ .Int = 41 },
     };
     const filePath = "examples/tests/TestSuite7.class";
-    _ = try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
@@ -215,7 +210,7 @@ test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
         .{ .Int = 6765 },
     };
     const filePath = "examples/tests/TestSuite8.class";
-    _ = try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 9 Double Arithmetic" {
@@ -236,7 +231,7 @@ test "ZJVM Test Suite 9 Double Arithmetic" {
         .{ .Top = {} },
     };
     const filePath = "examples/tests/TestSuite9.class";
-    _ = try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite(filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 10 Stdout Tests" {
@@ -285,7 +280,7 @@ test "ZJVM Test Suite 12 Stdout Tests" {
     try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
 }
 
-fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Value, logFilePath: []const u8) !i.JVMInterpreter {
+fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Value, logFilePath: []const u8) !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     var allocator = gpa.allocator();
     const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
@@ -312,8 +307,7 @@ fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Valu
         if (method.code) |codeAttr| {
             var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            var interpreter = try i.JVMInterpreter.init();
-            try interpreter.execute(&vm, &allocator);
+            try i.JVMInterpreter.execute(&vm, allocator);
 
             try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
 
@@ -355,7 +349,7 @@ fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Valu
                 }
             }
 
-            return interpreter;
+            return;
         } else {
             return error.NoCodeAttribute;
         }
@@ -381,5 +375,5 @@ test "ZJVM Test Suite 13 Long and Float Arithmetic" {
     const logFilePath = "examples/outputs/test_suite_13.log";
     const filePath = "examples/tests/TestSuite13.class";
 
-    _ = try makeTestDoubleArithmetic(filePath, &expectedValues, logFilePath);
+    try makeTestDoubleArithmetic(filePath, &expectedValues, logFilePath);
 }

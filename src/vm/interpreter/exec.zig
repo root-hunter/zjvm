@@ -17,17 +17,11 @@ const JavaString = @import("../native/java_lang.zig").JavaString;
 const JavaLang = @import("../native/java_lang.zig");
 
 pub const JVMInterpreter = struct {
-    print_alloc: std.mem.Allocator,
-
     pub fn init() !JVMInterpreter {
-        const allocator = std.heap.page_allocator;
-
-        return JVMInterpreter{
-            .print_alloc = allocator,
-        };
+        return JVMInterpreter{};
     }
 
-    fn getStatic(vm: *ZJVM, allocator: *std.mem.Allocator, frame: *Frame) !void {
+    fn getStatic(vm: *ZJVM, allocator: std.mem.Allocator, frame: *Frame) !void {
         const indexbyte1 = frame.getCodeByte(frame.pc + 1);
         const indexbyte2 = frame.getCodeByte(frame.pc + 2);
 
@@ -74,7 +68,7 @@ pub const JVMInterpreter = struct {
         }
     }
 
-    fn invokeVirtual(self: *JVMInterpreter, vm: *ZJVM, allocator: *std.mem.Allocator, frame: *Frame) !void {
+    fn invokeVirtual(vm: *ZJVM, allocator: std.mem.Allocator, frame: *Frame) !void {
         const indexbyte1 = frame.getCodeByte(frame.pc + 1);
         const indexbyte2 = frame.getCodeByte(frame.pc + 2);
 
@@ -82,7 +76,7 @@ pub const JVMInterpreter = struct {
 
         const methodref = try frame.class.getMethodRef(method_index);
 
-        const method = try MethodInfo.fromRef(allocator, frame.class, methodref);
+        const method = try MethodInfo.fromRef(&allocator, frame.class, methodref);
 
         if (method == null) {
             std.debug.print("Error: MethodRef at index {d} could not be resolved.\n", .{method_index});
@@ -114,7 +108,7 @@ pub const JVMInterpreter = struct {
         const np = method.?.num_params + 1;
 
         var ne = vm.getNativeEnv();
-        const args = self.print_alloc.alloc(Value, np) catch {
+        const args = allocator.alloc(Value, np) catch {
             std.debug.print("Error: Out of memory while allocating arguments for method invocation.\n", .{});
             return error.OutOfMemory;
         };
@@ -144,7 +138,7 @@ pub const JVMInterpreter = struct {
         };
     }
 
-    fn invokeDynamic(self: *JVMInterpreter, allocator: *std.mem.Allocator, frame: *Frame) !void {
+    fn invokeDynamic(allocator: std.mem.Allocator, frame: *Frame) !void {
         const index: u16 = (@as(u16, frame.getCodeByte(frame.pc + 1)) << 8) | @as(u16, frame.getCodeByte(frame.pc + 2));
 
         // --- COSTANTE CP ---
@@ -185,14 +179,14 @@ pub const JVMInterpreter = struct {
 
         // std.debug.print("  Template string: {s}\n", .{template_str});
 
-        var res = try std.ArrayList(u8).initCapacity(self.print_alloc, 64);
+        var res = try std.ArrayList(u8).initCapacity(allocator, 64);
         var param_idx: usize = 0;
-        var params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
+        var params = try std.ArrayList([]const u8).initCapacity(allocator, param_count);
 
         // std.debug.print("  Concatenating {d} parameters:\n", .{param_count});
 
         var i: usize = 0;
-        var temp_params = try std.ArrayList([]const u8).initCapacity(self.print_alloc, param_count);
+        var temp_params = try std.ArrayList([]const u8).initCapacity(allocator, param_count);
         while (i < param_count) : (i += 1) {
             var v = try frame.popOperand();
 
@@ -203,11 +197,11 @@ pub const JVMInterpreter = struct {
             var s: ?[]const u8 = null;
 
             switch (v) {
-                .Int => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
-                .Float => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
-                .Long => |x| s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x}),
+                .Int => |x| s = try std.fmt.allocPrint(allocator, "{}", .{x}),
+                .Float => |x| s = try std.fmt.allocPrint(allocator, "{}", .{x}),
+                .Long => |x| s = try std.fmt.allocPrint(allocator, "{}", .{x}),
                 .Double => |x| {
-                    s = try std.fmt.allocPrint(self.print_alloc, "{}", .{x});
+                    s = try std.fmt.allocPrint(allocator, "{}", .{x});
                 },
                 .Reference => |r| {
                     const js: *JavaString = @ptrCast(@alignCast(r));
@@ -221,21 +215,21 @@ pub const JVMInterpreter = struct {
 
             if (s == null) return error.UnsupportedType;
 
-            try temp_params.append(self.print_alloc, s.?);
+            try temp_params.append(allocator, s.?);
         }
 
         // --- Invertiamo l’array dei parametri per rispettare l’ordine JVM ---
         for (0..param_count) |j| {
-            try params.append(self.print_alloc, temp_params.items[param_count - 1 - j]);
+            try params.append(allocator, temp_params.items[param_count - 1 - j]);
         }
 
         for (template_str) |c| {
             if (c == 0x01) {
                 if (param_idx >= params.items.len) return error.InvalidParameterCount;
-                try res.appendSlice(self.print_alloc, params.items[param_idx]);
+                try res.appendSlice(allocator, params.items[param_idx]);
                 param_idx += 1;
             } else {
-                try res.append(self.print_alloc, c);
+                try res.append(allocator, c);
             }
         }
 
@@ -247,7 +241,7 @@ pub const JVMInterpreter = struct {
         });
     }
 
-    fn invokeStatic(vm: *ZJVM, allocator: *std.mem.Allocator, frame: *Frame) !void {
+    fn invokeStatic(vm: *ZJVM, allocator: std.mem.Allocator, frame: *Frame) !void {
         const index_high = frame.getCodeByte(frame.pc + 1);
         const index_low = frame.getCodeByte(frame.pc + 2);
 
@@ -261,7 +255,7 @@ pub const JVMInterpreter = struct {
 
         //frame.pc += 1 + opcode.getOperandLength();
 
-        var new_frame = try Frame.init(allocator, codeAttr, frame.class);
+        var new_frame = try Frame.init(&allocator, codeAttr, frame.class);
 
         for (0..method.num_params) |i| {
             const arg = try frame.popOperand();
@@ -271,7 +265,7 @@ pub const JVMInterpreter = struct {
         try vm.pushFrame(new_frame);
     }
 
-    pub fn execute(self: *JVMInterpreter, vm: *ZJVM, allocator: *std.mem.Allocator) !void {
+    pub fn execute(vm: *ZJVM, allocator: std.mem.Allocator) !void {
         while (true) {
             const frame = vm.currentFrame() orelse return error.NoFrame;
 
@@ -666,8 +660,8 @@ pub const JVMInterpreter = struct {
                 },
                 .GetStatic => try getStatic(vm, allocator, frame),
                 .InvokeStatic => try invokeStatic(vm, allocator, frame),
-                .InvokeVirtual => try self.invokeVirtual(vm, allocator, frame),
-                .InvokeDynamic => try self.invokeDynamic(allocator, frame),
+                .InvokeVirtual => try invokeVirtual(vm, allocator, frame),
+                .InvokeDynamic => try invokeDynamic(allocator, frame),
                 .New => {
                     const index_high = frame.getCodeByte(frame.pc + 1);
                     const index_low = frame.getCodeByte(frame.pc + 2);

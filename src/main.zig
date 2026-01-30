@@ -58,8 +58,7 @@ pub fn main() !void {
 
             var frame = try fr.Frame.init(&allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            var interpreter = try JVMInterpreter.init();
-            try interpreter.execute(&vm, &allocator);
+            try JVMInterpreter.execute(&vm, allocator);
             frame.dump();
 
             // try std.json.Stringify.value(try frame.toJSON(), .{ .whitespace = .indent_1 }, writer);
