@@ -389,11 +389,11 @@ pub const ClassInfo = struct {
         };
     }
 
-    pub fn getClassName(self: *ClassInfo) []const u8 {
+    pub fn getClassName(self: *const ClassInfo) []const u8 {
         return self.name;
     }
 
-    pub fn getSuperClassName(self: *ClassInfo) []const u8 {
+    pub fn getSuperClassName(self: *const ClassInfo) []const u8 {
         return self.super_class_name;
     }
 

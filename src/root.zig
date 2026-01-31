@@ -10,63 +10,33 @@ const ZJVMGPA = @import("vm/vm.zig").ZJVMGPA;
 
 const testing = std.testing;
 
-fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
+fn makeTestSuite(className: []const u8, filePath: []const u8, expectedValues: []const v.Value) !void {
     var gpa = ZJVMGPA{};
-    var allocator = gpa.allocator();
 
-    var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
-    defer file.close();
-
-    const file_size = try file.getEndPos();
-    const data = try file.readToEndAlloc(allocator, file_size);
-    defer allocator.free(data);
-
-    var cursor = utils.Cursor.init(data);
-    var classInfo = parser.ClassInfo.init(&allocator);
-    defer classInfo.deinit();
-
-    try classInfo.parse(&cursor);
-
-    const mMain = try classInfo.getMethod("main");
     var vm = try ZJVM.bootstrap(&gpa, 1024);
 
-    if (mMain) |method| {
-        if (method.code) |codeAttr| {
-            var frame = try fr.Frame.init(gpa.allocator(), codeAttr, &classInfo);
-            try vm.pushFrame(frame);
-            try i.JVMInterpreter.execute(&vm);
+    try vm.loadClassFromFile(filePath);
+    var frame = try vm.execClassMethodReturnFrame(className, "main");
+    try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
 
-            try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
-
-            var index: usize = 0;
-            while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
-                try testing.expectEqual(expectedValues[index], frame.local_vars.get(index));
-            }
-        } else {
-            return error.NoCodeAttribute;
-        }
+    var index: usize = 0;
+    while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
+        try testing.expectEqual(expectedValues[index], frame.local_vars.get(index));
     }
 }
 
-fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: []const []const u8) !void {
+fn makeTestPrints(className: []const u8, filePath: []const u8, logFilePath: []const u8, expectedLines: []const []const u8) !void {
     var gpa = ZJVMGPA{};
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
 
-    var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
-    defer file.close();
+    const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
+    defer logFile.close();
 
-    const file_size = try file.getEndPos();
-    const data = try file.readToEndAlloc(allocator, file_size);
-    defer allocator.free(data);
-
-    var cursor = utils.Cursor.init(data);
-    var classInfo = parser.ClassInfo.init(&allocator);
-    defer classInfo.deinit();
-
-    try classInfo.parse(&cursor);
-
-    const mMain = try classInfo.getMethod("main");
     var vm = try ZJVM.bootstrap(&gpa, 1024);
+    vm.setStdout(logFile);
+
+    try vm.loadClassFromFile(filePath);
+    try vm.execClassMethod(className, "main");
 
     const res = std.fs.cwd().makeDir("examples/outputs");
 
@@ -74,37 +44,20 @@ fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: 
         try res;
     }
 
-    const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
-    vm.setStdout(logFile);
+    const logData = try std.fs.cwd().readFileAlloc(allocator, logFilePath, 1024 * 1024);
+    defer allocator.free(logData);
 
-    if (mMain) |method| {
-        if (method.code) |codeAttr| {
-            const frame = try fr.Frame.init(gpa.allocator(), codeAttr, &classInfo);
-            try vm.pushFrame(frame);
-            try i.JVMInterpreter.execute(&vm);
+    var logCursor = utils.Cursor.init(logData);
+    var line_index: usize = 0;
 
-            // Compare log file with expected output
+    while (logCursor.position < logData.len and line_index < expectedLines.len) : (line_index += 1) {
+        const line = try logCursor.readUntilDelimiterOrEof('\n');
+        const expected_line = expectedLines[line_index];
+        try testing.expectEqualSlices(u8, expected_line, line);
+    }
 
-            const logData = try std.fs.cwd().readFileAlloc(allocator, logFilePath, 1024 * 1024);
-            defer allocator.free(logData);
-
-            var logCursor = utils.Cursor.init(logData);
-            var line_index: usize = 0;
-
-            while (logCursor.position < logData.len and line_index < expectedLines.len) : (line_index += 1) {
-                const line = try logCursor.readUntilDelimiterOrEof('\n');
-                const expected_line = expectedLines[line_index];
-                try testing.expectEqualSlices(u8, expected_line, line);
-            }
-
-            if (line_index != expectedLines.len) {
-                return error.IncorrectNumberOfOutputLines;
-            }
-        } else {
-            return error.NoCodeAttribute;
-        }
-    } else {
-        return error.MethodMainNotFound;
+    if (line_index != expectedLines.len) {
+        return error.IncorrectNumberOfOutputLines;
     }
 }
 
@@ -120,7 +73,7 @@ test "ZJVM Test Suite 1" {
     };
     const filePath = "examples/tests/TestSuite1.class";
 
-    try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite("TestSuite1", filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 2" {
@@ -132,7 +85,7 @@ test "ZJVM Test Suite 2" {
         .{ .Int = 80 },
     };
     const filePath = "examples/tests/TestSuite2.class";
-    try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite("TestSuite2", filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 3" {
@@ -145,7 +98,7 @@ test "ZJVM Test Suite 3" {
         .{ .Int = 0 },
     };
     const filePath = "examples/tests/TestSuite3.class";
-    try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite("TestSuite3", filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 4" {
@@ -160,7 +113,7 @@ test "ZJVM Test Suite 4" {
         .{ .Int = 24100 },
     };
     const filePath = "examples/tests/TestSuite4.class";
-    try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite("TestSuite4", filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 5" {
@@ -171,7 +124,7 @@ test "ZJVM Test Suite 5" {
         .{ .Int = 20736 },
     };
     const filePath = "examples/tests/TestSuite5.class";
-    try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite("TestSuite5", filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 6" {
@@ -183,7 +136,7 @@ test "ZJVM Test Suite 6" {
         .{ .Int = 5013 },
     };
     const filePath = "examples/tests/TestSuite6.class";
-    try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite("TestSuite6", filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 7" {
@@ -195,7 +148,7 @@ test "ZJVM Test Suite 7" {
         .{ .Int = 41 },
     };
     const filePath = "examples/tests/TestSuite7.class";
-    try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite("TestSuite7", filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
@@ -211,7 +164,7 @@ test "ZJVM Test Suite 8 (Fibonacci - Recursion)" {
         .{ .Int = 6765 },
     };
     const filePath = "examples/tests/TestSuite8.class";
-    try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite("TestSuite8", filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 9 Double Arithmetic" {
@@ -232,7 +185,7 @@ test "ZJVM Test Suite 9 Double Arithmetic" {
         .{ .Top = {} },
     };
     const filePath = "examples/tests/TestSuite9.class";
-    try makeTestSuite(filePath, &expectedValues);
+    try makeTestSuite("TestSuite9", filePath, &expectedValues);
 }
 
 test "ZJVM Test Suite 10 Stdout Tests" {
@@ -240,7 +193,7 @@ test "ZJVM Test Suite 10 Stdout Tests" {
     const logFilePath = "examples/outputs/test_suite_10.log";
     const expectedLines = [_][]const u8{ "1024", "Hello, World! My name is ZJVM.", "This is Test Suite 10.", "12.12", "34.56", "7890123456", "1", "90" };
 
-    try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
+    try makeTestPrints("TestSuite10", filePath, logFilePath, expectedLines[0..]);
 }
 
 test "ZJVM Test Suite 11 Stdout Tests" {
@@ -248,7 +201,7 @@ test "ZJVM Test Suite 11 Stdout Tests" {
     const logFilePath = "examples/outputs/test_suite_11.log";
     const expectedLines = [_][]const u8{ "Hello, World! My name is ZJVM.", "1024", "1048576", "This is Test Suite 11.", "C = 1024", "D = 1048576 bytes( 1 MB )", "E = 3.14" };
 
-    try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
+    try makeTestPrints("TestSuite11", filePath, logFilePath, expectedLines[0..]);
 }
 
 test "ZJVM Test Suite 12 Stdout Tests" {
@@ -278,85 +231,62 @@ test "ZJVM Test Suite 12 Stdout Tests" {
         "27 is divisible by 3",
         "30 is divisible by 15",
     };
-    try makeTestPrints(filePath, logFilePath, expectedLines[0..]);
+    try makeTestPrints("TestSuite12", filePath, logFilePath, expectedLines[0..]);
 }
 
-fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Value, logFilePath: []const u8) !void {
+fn makeTestDoubleArithmetic(className: []const u8, filePath: []const u8, expectedValues: []const v.Value, logFilePath: []const u8) !void {
     var gpa = ZJVMGPA{};
-    var allocator = gpa.allocator();
+
     const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
     defer logFile.close();
 
-    var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
-    defer file.close();
-
-    const file_size = try file.getEndPos();
-    const data = try file.readToEndAlloc(allocator, file_size);
-    defer allocator.free(data);
-
-    var cursor = utils.Cursor.init(data);
-    var classInfo = parser.ClassInfo.init(&allocator);
-    defer classInfo.deinit();
-
-    try classInfo.parse(&cursor);
-
-    const mMain = try classInfo.getMethod("main");
     var vm = try ZJVM.bootstrap(&gpa, 1024);
     vm.setStdout(logFile);
 
-    if (mMain) |method| {
-        if (method.code) |codeAttr| {
-            var frame = try fr.Frame.init(gpa.allocator(), codeAttr, &classInfo);
-            try vm.pushFrame(frame);
-            try i.JVMInterpreter.execute(&vm);
+    try vm.loadClassFromFile(filePath);
+    var frame = try vm.execClassMethodReturnFrame(className, "main");
 
-            try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
+    try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
 
-            var index: usize = 0;
+    var index: usize = 0;
 
-            const deltaFloat = 0.00001;
-            const deltaDouble = 0.00000001;
-            while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
-                switch (expectedValues[index]) {
-                    .Top => {
-                        const expected = expectedValues[index].Top;
-                        const actual = frame.local_vars.get(index).Top;
+    const deltaFloat = 0.00001;
+    const deltaDouble = 0.00000001;
+    while (index < frame.local_vars.vars.len and index < expectedValues.len) : (index += 1) {
+        switch (expectedValues[index]) {
+            .Top => {
+                const expected = expectedValues[index].Top;
+                const actual = frame.local_vars.get(index).Top;
 
-                        try testing.expectEqual(expected, actual);
-                    },
-                    .Int => {
-                        const expected = expectedValues[index].Int;
-                        const actual = frame.local_vars.get(index).Int;
-                        try testing.expectEqual(expected, actual);
-                    },
-                    .Long => {
-                        const expected = expectedValues[index].Long;
-                        const actual = frame.local_vars.get(index).Long;
-                        try testing.expectEqual(expected, actual);
-                    },
-                    .Float => {
-                        const expected = expectedValues[index].Float;
-                        const actual = frame.local_vars.get(index).Float;
-                        try testing.expect(@abs(expected - actual) < deltaFloat);
-                    },
-                    .Double => {
-                        const expected = expectedValues[index].Double;
-                        const actual = frame.local_vars.get(index).Double;
-                        try testing.expect(@abs(expected - actual) < deltaDouble);
-                    },
-                    else => {
-                        return error.UnhandledValueTypeInTest;
-                    },
-                }
-            }
-
-            return;
-        } else {
-            return error.NoCodeAttribute;
+                try testing.expectEqual(expected, actual);
+            },
+            .Int => {
+                const expected = expectedValues[index].Int;
+                const actual = frame.local_vars.get(index).Int;
+                try testing.expectEqual(expected, actual);
+            },
+            .Long => {
+                const expected = expectedValues[index].Long;
+                const actual = frame.local_vars.get(index).Long;
+                try testing.expectEqual(expected, actual);
+            },
+            .Float => {
+                const expected = expectedValues[index].Float;
+                const actual = frame.local_vars.get(index).Float;
+                try testing.expect(@abs(expected - actual) < deltaFloat);
+            },
+            .Double => {
+                const expected = expectedValues[index].Double;
+                const actual = frame.local_vars.get(index).Double;
+                try testing.expect(@abs(expected - actual) < deltaDouble);
+            },
+            else => {
+                return error.UnhandledValueTypeInTest;
+            },
         }
-    } else {
-        return error.MethodMainNotFound;
     }
+
+    return;
 }
 
 test "ZJVM Test Suite 13 Long and Float Arithmetic" {
@@ -376,5 +306,5 @@ test "ZJVM Test Suite 13 Long and Float Arithmetic" {
     const logFilePath = "examples/outputs/test_suite_13.log";
     const filePath = "examples/tests/TestSuite13.class";
 
-    try makeTestDoubleArithmetic(filePath, &expectedValues, logFilePath);
+    try makeTestDoubleArithmetic("TestSuite13", filePath, &expectedValues, logFilePath);
 }

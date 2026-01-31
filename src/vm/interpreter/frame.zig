@@ -34,7 +34,7 @@ pub const Frame = struct {
 
     operand_stack: OperandStack,
     local_vars: LocalVars,
-    codeAttr: ?ca.CodeAttribute,
+    codeAttr: *const ca.CodeAttribute,
     pc: usize,
 
     // ZJVM adds
@@ -42,7 +42,7 @@ pub const Frame = struct {
 
     pub fn init(
         gpa: std.mem.Allocator,
-        codeAttr: ca.CodeAttribute,
+        codeAttr: *const ca.CodeAttribute,
         class: *const p.ClassInfo,
     ) !Frame {
         var arena = std.heap.ArenaAllocator.init(gpa);
@@ -59,11 +59,11 @@ pub const Frame = struct {
     }
 
     pub fn getCodeLength(self: *const Frame) usize {
-        return self.codeAttr.?.getCodeLength();
+        return self.codeAttr.getCodeLength();
     }
 
     pub fn getCodeByte(self: *const Frame, index: usize) u8 {
-        return self.codeAttr.?.getByte(index);
+        return self.codeAttr.getByte(index);
     }
 
     pub fn pushOperand(self: *Frame, value: v.Value) !void {

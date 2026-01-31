@@ -36,6 +36,7 @@ test:
 clean:
 	@echo "Cleaning ZJVM build artifacts..."
 	rm -rf zig-out
+	rm -rf .zig-cache
 	@echo "ZJVM clean complete."
 
 run: build

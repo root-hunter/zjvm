@@ -259,7 +259,7 @@ pub const JVMInterpreter = struct {
 
         //frame.pc += 1 + opcode.getOperandLength();
 
-        var new_frame = try Frame.init(allocator, codeAttr, frame.class);
+        var new_frame = try Frame.init(allocator, &codeAttr, frame.class);
 
         for (0..method.num_params) |i| {
             const arg = try frame.popOperand();

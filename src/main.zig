@@ -13,6 +13,8 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
+    var vm = try ZJVM.bootstrap(&gpa, 1024);
+
     var argv = try std.process.argsWithAllocator(allocator);
     defer argv.deinit();
 
@@ -23,54 +25,15 @@ pub fn main() !void {
         return;
     };
 
-    std.debug.print("Loading class file: {s}\n", .{class_path});
+    try vm.loadClassFromFile(class_path);
 
-    var file = try std.fs.cwd().openFile(class_path, .{ .mode = .read_only });
-    defer file.close();
-
-    const file_size = try file.getEndPos();
-    const data = try file.readToEndAlloc(allocator, file_size);
-    defer allocator.free(data);
-
-    var cursor = utils.Cursor.init(data);
-    var classInfo = parser.ClassInfo.init(&allocator);
-    defer classInfo.deinit();
-
-    try classInfo.parse(&cursor);
-
-    const json_file_path = "debug/export.json";
-
-    var out = std.Io.Writer.Allocating.init(allocator);
-    defer out.deinit();
-    //const writer = &out.writer;
-
-    //try std.json.Stringify.value(.{ .id = 1, .name = "test" }, .{}, writer);
-    // const obj = try classInfo.toJSON();
-
-    var json_file = try std.fs.cwd().createFile(json_file_path, .{ .truncate = true, .mode = 0o644 });
-    defer json_file.close();
-
-    const mMain = try classInfo.getMethod("main");
-    try classInfo.dump();
-
-    var vm = try ZJVM.bootstrap(&gpa, 1024);
-
-    if (mMain) |method| {
-        if (method.code) |codeAttr| {
-            std.debug.print("Starting execution of 'main'...\n", .{});
-
-            var frame = try fr.Frame.init(allocator, codeAttr, &classInfo);
-            try vm.pushFrame(frame);
-            try JVMInterpreter.execute(&vm);
-            frame.dump();
-
-            // try std.json.Stringify.value(try frame.toJSON(), .{ .whitespace = .indent_1 }, writer);
-            // const json_str = out.written();
-            // try json_file.writeAll(json_str);
-
-            std.debug.print("Execution of 'main' completed.\n", .{});
-        } else {
-            std.debug.print("No code attribute found for method 'main'\n", .{});
-        }
+    var keys = vm.classes.keyIterator();
+    while (keys.next()) |key| {
+        std.debug.print("Loaded class key: {s}\n", .{key.*});
     }
+
+    var frame = try vm.execClassMethodReturnFrame("BigIterationPrint", "main");
+    frame.dump();
+
+    std.debug.print("Execution finished.\n", .{});
 }
