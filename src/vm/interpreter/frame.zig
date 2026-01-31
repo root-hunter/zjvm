@@ -47,12 +47,19 @@ pub const Frame = struct {
     ) !Frame {
         var arena = std.heap.ArenaAllocator.init(gpa);
         const allocator = arena.allocator();
+
+        const code = allocator.create(ca.CodeAttribute) catch {
+            arena.deinit();
+            return error.OutOfMemory;
+        };
+        code.* = codeAttr.*;
+
         return Frame{
             .arena = arena,
             .allocator = allocator,
             .operand_stack = try OperandStack.init(allocator, codeAttr.max_stack),
             .local_vars = try LocalVars.init(allocator, codeAttr.max_locals),
-            .codeAttr = codeAttr,
+            .codeAttr = code,
             .pc = 0,
             .class = class,
         };

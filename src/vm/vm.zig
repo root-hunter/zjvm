@@ -142,19 +142,13 @@ pub const ZJVM = struct {
     pub fn execClassMethodReturnFrame(self: *ZJVM, className: []const u8, methodName: []const u8) !Frame {
         const method = try self.getMethodFromClass(className, methodName);
         if (method) |m| {
-            if (m.code) |codeAttr| {
-                // std.debug.print("Executing method: {s}.{s}\n", .{ className, methodName });
+            const codeAttrPtr = &m.code.?;
+            const classInfo = self.getClassInfo(className).?;
+            const frame = try f.Frame.init(self.allocator, codeAttrPtr, classInfo);
+            try self.pushFrame(frame);
+            try self.execute();
 
-                const classInfo = self.getClassInfo(className).?;
-                const frame = try f.Frame.init(self.allocator, &codeAttr, classInfo);
-
-                try self.pushFrame(frame);
-                try self.execute();
-
-                return frame;
-            } else {
-                return error.MethodHasNoCode;
-            }
+            return frame;
         } else {
             return error.MethodNotFound;
         }

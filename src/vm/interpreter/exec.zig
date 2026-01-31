@@ -17,9 +17,8 @@ const JavaString = @import("../native/java_lang.zig").JavaString;
 const JavaLang = @import("../native/java_lang.zig");
 
 pub const JVMInterpreter = struct {
-    fn getStatic(vm: *ZJVM, allocator: std.mem.Allocator, frame: *Frame) !void {
+    fn getStatic(vm: *ZJVM, frame: *Frame) !void {
         _ = vm;
-        _ = allocator;
 
         const indexbyte1 = frame.getCodeByte(frame.pc + 1);
         const indexbyte2 = frame.getCodeByte(frame.pc + 2);
@@ -67,7 +66,8 @@ pub const JVMInterpreter = struct {
         }
     }
 
-    fn invokeVirtual(vm: *ZJVM, allocator: std.mem.Allocator, frame: *Frame) !void {
+    fn invokeVirtual(vm: *ZJVM, frame: *Frame) !void {
+        const allocator = vm.allocator;
         const indexbyte1 = frame.getCodeByte(frame.pc + 1);
         const indexbyte2 = frame.getCodeByte(frame.pc + 2);
 
@@ -139,7 +139,8 @@ pub const JVMInterpreter = struct {
         };
     }
 
-    fn invokeDynamic(allocator: std.mem.Allocator, frame: *Frame) !void {
+    fn invokeDynamic(vm: *ZJVM, frame: *Frame) !void {
+        const allocator = vm.allocator;
         const index: u16 = (@as(u16, frame.getCodeByte(frame.pc + 1)) << 8) | @as(u16, frame.getCodeByte(frame.pc + 2));
 
         // --- COSTANTE CP ---
@@ -245,7 +246,8 @@ pub const JVMInterpreter = struct {
         });
     }
 
-    fn invokeStatic(vm: *ZJVM, allocator: std.mem.Allocator, frame: *Frame) !void {
+    fn invokeStatic(vm: *ZJVM, frame: *Frame) !void {
+        const allocator = vm.allocator;
         const index_high = frame.getCodeByte(frame.pc + 1);
         const index_low = frame.getCodeByte(frame.pc + 2);
 
@@ -666,10 +668,10 @@ pub const JVMInterpreter = struct {
                     if (vm.stack.top == 0) break;
                     continue;
                 },
-                .GetStatic => try getStatic(vm, allocator, frame),
-                .InvokeStatic => try invokeStatic(vm, allocator, frame),
-                .InvokeVirtual => try invokeVirtual(vm, allocator, frame),
-                .InvokeDynamic => try invokeDynamic(allocator, frame),
+                .GetStatic => try getStatic(vm, frame),
+                .InvokeStatic => try invokeStatic(vm, frame),
+                .InvokeVirtual => try invokeVirtual(vm, frame),
+                .InvokeDynamic => try invokeDynamic(vm, frame),
                 .New => {
                     const index_high = frame.getCodeByte(frame.pc + 1);
                     const index_low = frame.getCodeByte(frame.pc + 2);
