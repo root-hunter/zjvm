@@ -5,6 +5,8 @@ const registry = @import("native/registry.zig");
 const Heap = @import("heap/heap.zig").Heap;
 const JavaLang = @import("native/java_lang.zig");
 
+pub const ZJVMGPA = std.heap.GeneralPurposeAllocator(.{ .enable_memory_limit = false, .safety = false });
+
 pub const ZJVMJSON = struct {
     stack: s.JVMStackJSON,
 
@@ -16,6 +18,9 @@ pub const ZJVMJSON = struct {
 };
 
 pub const ZJVM = struct {
+    gpa: *const ZJVMGPA,
+    allocator: std.mem.Allocator,
+
     stack: s.JVMStack,
     nr: registry.NativeRegistry,
     heap: Heap,
@@ -39,16 +44,20 @@ pub const ZJVM = struct {
         };
     }
 
-    pub fn bootstrap(allocator: *const std.mem.Allocator, maxFrames: usize) !ZJVM {
-        const alloc = std.heap.page_allocator;
-        var nr = try registry.NativeRegistry.init(alloc);
+    pub fn bootstrap(gpa: *ZJVMGPA, maxFrames: usize) !ZJVM {
+        const heap_allocator = std.heap.page_allocator;
+        const allocator = gpa.allocator();
+
+        var nr = try registry.NativeRegistry.init(allocator);
         try JavaLang.registerAll(&nr);
 
         return ZJVM{
-            .stack = try s.JVMStack.init(allocator, maxFrames),
+            .gpa = gpa,
+            .allocator = allocator,
+            .stack = try s.JVMStack.init(&allocator, maxFrames),
             .stdout = std.fs.File.stdout(),
             .stdin = std.fs.File.stdin(),
-            .heap = Heap.init(alloc),
+            .heap = Heap.init(heap_allocator),
             .nr = nr,
         };
     }

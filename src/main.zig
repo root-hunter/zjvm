@@ -8,7 +8,7 @@ const JVMInterpreter = @import("vm/interpreter/exec.zig").JVMInterpreter;
 const ZJVM = @import("vm/vm.zig").ZJVM;
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .enable_memory_limit = false, .safety = true }){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .enable_memory_limit = false, .safety = false }){};
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
@@ -53,7 +53,7 @@ pub fn main() !void {
     const mMain = try classInfo.getMethod("main");
     try classInfo.dump();
 
-    var vm = try ZJVM.bootstrap(&allocator, 1024);
+    var vm = try ZJVM.bootstrap(&gpa, 1024);
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
@@ -61,7 +61,7 @@ pub fn main() !void {
 
             var frame = try fr.Frame.init(allocator, codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            try JVMInterpreter.execute(&vm, allocator);
+            try JVMInterpreter.execute(&vm);
             frame.dump();
 
             // try std.json.Stringify.value(try frame.toJSON(), .{ .whitespace = .indent_1 }, writer);

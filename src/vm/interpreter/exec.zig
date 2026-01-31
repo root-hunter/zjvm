@@ -129,7 +129,7 @@ pub const JVMInterpreter = struct {
 
         const this = try frame.popOperand(); // pop this
         args[np - 1] = this;
-        
+
         _ = bootstrap_method.?(
             &ne,
             args,
@@ -269,7 +269,9 @@ pub const JVMInterpreter = struct {
         try vm.pushFrame(new_frame);
     }
 
-    pub fn execute(vm: *ZJVM, allocator: std.mem.Allocator) !void {
+    pub fn execute(vm: *ZJVM) !void {
+        const allocator = vm.allocator;
+
         while (true) {
             const frame = vm.currentFrame() orelse return error.NoFrame;
 

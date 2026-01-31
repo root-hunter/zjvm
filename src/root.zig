@@ -6,11 +6,12 @@ const fr = @import("vm/interpreter/frame.zig");
 const i = @import("vm/interpreter/exec.zig");
 const v = @import("vm/interpreter/value.zig");
 const ZJVM = @import("vm/vm.zig").ZJVM;
+const ZJVMGPA = @import("vm/vm.zig").ZJVMGPA;
 
 const testing = std.testing;
 
 fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
-    var gpa = std.heap.DebugAllocator(.{}){};
+    var gpa = ZJVMGPA{};
     var allocator = gpa.allocator();
 
     var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
@@ -27,13 +28,13 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
     try classInfo.parse(&cursor);
 
     const mMain = try classInfo.getMethod("main");
-    var vm = try ZJVM.bootstrap(&allocator, 1024);
+    var vm = try ZJVM.bootstrap(&gpa, 1024);
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
-            var frame = try fr.Frame.init(allocator, codeAttr, &classInfo);
+            var frame = try fr.Frame.init(gpa.allocator(), codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            try i.JVMInterpreter.execute(&vm, allocator);
+            try i.JVMInterpreter.execute(&vm);
 
             try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
 
@@ -48,7 +49,7 @@ fn makeTestSuite(filePath: []const u8, expectedValues: []const v.Value) !void {
 }
 
 fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: []const []const u8) !void {
-    var gpa = std.heap.DebugAllocator(.{}){};
+    var gpa = ZJVMGPA{};
     var allocator = gpa.allocator();
 
     var file = try std.fs.cwd().openFile(filePath, .{ .mode = .read_only });
@@ -65,7 +66,7 @@ fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: 
     try classInfo.parse(&cursor);
 
     const mMain = try classInfo.getMethod("main");
-    var vm = try ZJVM.bootstrap(&allocator, 1024);
+    var vm = try ZJVM.bootstrap(&gpa, 1024);
 
     const res = std.fs.cwd().makeDir("examples/outputs");
 
@@ -78,9 +79,9 @@ fn makeTestPrints(filePath: []const u8, logFilePath: []const u8, expectedLines: 
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
-            const frame = try fr.Frame.init(allocator, codeAttr, &classInfo);
+            const frame = try fr.Frame.init(gpa.allocator(), codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            try i.JVMInterpreter.execute(&vm, allocator);
+            try i.JVMInterpreter.execute(&vm);
 
             // Compare log file with expected output
 
@@ -281,7 +282,7 @@ test "ZJVM Test Suite 12 Stdout Tests" {
 }
 
 fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Value, logFilePath: []const u8) !void {
-    var gpa = std.heap.DebugAllocator(.{}){};
+    var gpa = ZJVMGPA{};
     var allocator = gpa.allocator();
     const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
     defer logFile.close();
@@ -300,14 +301,14 @@ fn makeTestDoubleArithmetic(filePath: []const u8, expectedValues: []const v.Valu
     try classInfo.parse(&cursor);
 
     const mMain = try classInfo.getMethod("main");
-    var vm = try ZJVM.bootstrap(&allocator, 1024);
+    var vm = try ZJVM.bootstrap(&gpa, 1024);
     vm.setStdout(logFile);
 
     if (mMain) |method| {
         if (method.code) |codeAttr| {
-            var frame = try fr.Frame.init(allocator, codeAttr, &classInfo);
+            var frame = try fr.Frame.init(gpa.allocator(), codeAttr, &classInfo);
             try vm.pushFrame(frame);
-            try i.JVMInterpreter.execute(&vm, allocator);
+            try i.JVMInterpreter.execute(&vm);
 
             try testing.expectEqual(expectedValues.len, frame.local_vars.vars.len);
 
