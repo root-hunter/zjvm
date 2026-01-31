@@ -648,8 +648,8 @@ pub const JVMInterpreter = struct {
                 .IReturn => {
                     const return_value = try frame.popOperand();
 
-                    var popFrame = try vm.stack.pop();
-                    popFrame.deinit();
+                    _ = try vm.stack.pop();
+                    // popFrame.deinit();
 
                     if (vm.stack.top == 0) {
                         break;
@@ -661,8 +661,8 @@ pub const JVMInterpreter = struct {
                     continue;
                 },
                 .Return => { // return
-                    var popFrame = try vm.stack.pop();
-                    popFrame.deinit();
+                    _ = try vm.stack.pop();
+                    // popFrame.deinit();
                     if (vm.stack.top == 0) break;
                     continue;
                 },
