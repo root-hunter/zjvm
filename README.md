@@ -1,3 +1,5 @@
+![ZJVM CLI](https://github.com/root-hunter/zjvm/releases/download/v0.4.4/good.gif)
+
 # ZJVM - Java Virtual Machine in Zig
 
 A high-performance Java Virtual Machine (JVM) implementation written in Zig, featuring a complete bytecode interpreter, runtime environment, and native method support.

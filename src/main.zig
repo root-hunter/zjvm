@@ -32,8 +32,6 @@ pub fn main() !void {
         std.debug.print("Loaded class key: {s}\n", .{key.*});
     }
 
-    var frame = try vm.execClassMethodReturnFrame("BigIterationPrint", "main");
-    frame.dump();
-
-    std.debug.print("Execution finished.\n", .{});
+    _ = try vm.execClassMethodReturnFrame("BigIterationPrint", "main");
+    // frame.dump();
 }
