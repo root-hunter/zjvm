@@ -100,7 +100,7 @@ pub const ZJVM = struct {
     }
 
     pub fn loadClassFromFile(self: *ZJVM, path: []const u8) !void {
-        std.debug.print("Loading class file: {s}\n", .{path});
+        // std.debug.print("Loading class file: {s}\n", .{path});
 
         var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
         defer file.close();
@@ -120,7 +120,7 @@ pub const ZJVM = struct {
 
         try self.classes.put(classNamePtr, classInfoPtr);
 
-        std.debug.print("Loaded class: {s}\n", .{classNamePtr});
+        // std.debug.print("Loaded class: {s}\n", .{classNamePtr});
     }
 
     pub fn getMethodFromClass(self: *ZJVM, className: []const u8, methodName: []const u8) !?MethodInfo {
@@ -143,7 +143,7 @@ pub const ZJVM = struct {
         const method = try self.getMethodFromClass(className, methodName);
         if (method) |m| {
             if (m.code) |codeAttr| {
-                std.debug.print("Executing method: {s}.{s}\n", .{ className, methodName });
+                // std.debug.print("Executing method: {s}.{s}\n", .{ className, methodName });
 
                 const classInfo = self.getClassInfo(className).?;
                 const frame = try f.Frame.init(self.allocator, &codeAttr, classInfo);
