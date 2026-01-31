@@ -29,6 +29,12 @@ fn makeTestPrints(className: []const u8, filePath: []const u8, logFilePath: []co
     var gpa = ZJVMGPA{};
     const allocator = gpa.allocator();
 
+    const res = std.fs.cwd().makeDir("examples/outputs");
+
+    if (res != error.PathAlreadyExists) {
+        try res;
+    }
+
     const logFile = try std.fs.cwd().createFile(logFilePath, .{ .truncate = true });
     defer logFile.close();
 
@@ -37,12 +43,6 @@ fn makeTestPrints(className: []const u8, filePath: []const u8, logFilePath: []co
 
     try vm.loadClassFromFile(filePath);
     try vm.execClassMethod(className, "main");
-
-    const res = std.fs.cwd().makeDir("examples/outputs");
-
-    if (res != error.PathAlreadyExists) {
-        try res;
-    }
 
     const logData = try std.fs.cwd().readFileAlloc(allocator, logFilePath, 1024 * 1024);
     defer allocator.free(logData);
